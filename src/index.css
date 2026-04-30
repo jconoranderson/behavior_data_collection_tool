@@ -412,3 +412,47 @@ select.form-control {
   background: #fff;
   box-shadow: 0 0 0 2px var(--primary) inset;
 }
+
+/* Rocker Input */
+.rocker-input {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  overflow: hidden;
+  background: white;
+}
+
+.rocker-btn {
+  background: #f3f4f6;
+  border: none;
+  width: 24px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.rocker-btn:hover {
+  background: #e5e7eb;
+}
+
+.rocker-field {
+  width: 40px;
+  text-align: center;
+  border: none;
+  padding: 0;
+  box-shadow: none !important;
+}
+
+.rocker-field::-webkit-outer-spin-button,
+.rocker-field::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.rocker-field[type=number] {
+  -moz-appearance: textfield;
+}

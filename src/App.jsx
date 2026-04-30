@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Table, Plus, Trash2, Shield, Activity, User, ArrowLeft } from 'lucide-react';
+import { Table, Plus, Minus, Trash2, Shield, Activity, User, ArrowLeft } from 'lucide-react';
 import tcfdLogo from './assets/tcfd.jpg';
 
 const AVAILABLE_BEHAVIORS = [
@@ -39,6 +39,27 @@ const SCIPR_CATEGORIES = {
 
 const EDUCATION_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 const RESIDENTIAL_SHIFTS = ["7-3", "3-11", "11-7"];
+
+const RockerInput = ({ value, onChange }) => {
+  const val = value ? parseInt(value, 10) : 0;
+  return (
+    <div className="rocker-input">
+      <button className="rocker-btn" onClick={() => onChange(Math.max(0, val - 1))}>
+        <Minus size={14} />
+      </button>
+      <input 
+        type="number" 
+        min="0"
+        className="table-input rocker-field" 
+        value={value} 
+        onChange={e => onChange(e.target.value)} 
+      />
+      <button className="rocker-btn" onClick={() => onChange(val + 1)}>
+        <Plus size={14} />
+      </button>
+    </div>
+  );
+};
 
 function App() {
   const [currentView, setCurrentView] = useState('setup');
@@ -170,14 +191,10 @@ function App() {
                       <tr key={`${behavior}_${sub}`}>
                         <td style={{ paddingLeft: '20px', fontStyle: 'italic', backgroundColor: '#f8f8f8' }}>{sub}</td>
                         {columns.map(col => (
-                          <td key={col} style={{ backgroundColor: '#fff' }}>
-                            <input 
-                              type="number" 
-                              min="0"
-                              className="table-input" 
-                              style={{ textAlign: 'center' }}
+                          <td key={col} style={{ backgroundColor: '#fff', padding: '0.25rem' }}>
+                            <RockerInput 
                               value={trackerData[`${behavior}_${sub}_${col}`] || ''} 
-                              onChange={e => handleCellChange(`${behavior}_${sub}`, col, e.target.value)} 
+                              onChange={val => handleCellChange(`${behavior}_${sub}`, col, val)}
                             />
                           </td>
                         ))}
@@ -196,14 +213,10 @@ function App() {
                     <tr key={m}>
                       <td style={{ paddingLeft: '20px', fontStyle: 'italic', backgroundColor: '#fffadc' }}>{m}</td>
                       {columns.map(col => (
-                        <td key={col} style={{ backgroundColor: '#fff' }}>
-                          <input 
-                            type="number" 
-                            min="0"
-                            className="table-input" 
-                            style={{ textAlign: 'center' }}
+                        <td key={col} style={{ backgroundColor: '#fff', padding: '0.25rem' }}>
+                          <RockerInput 
                             value={trackerData[`SCIP_${m}_${col}`] || ''} 
-                            onChange={e => handleCellChange(`SCIP_${m}`, col, e.target.value)} 
+                            onChange={val => handleCellChange(`SCIP_${m}`, col, val)}
                           />
                         </td>
                       ))}
