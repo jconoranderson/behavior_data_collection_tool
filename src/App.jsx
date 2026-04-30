@@ -133,6 +133,24 @@ function App() {
     }));
   };
 
+  const getIntensitySum = (behavior, col) => {
+    let sum = 0;
+    AVAILABLE_DIMENSIONS["Intensity"].forEach(level => {
+      const val = parseInt(trackerData[`${behavior}_${level}_${col}`], 10);
+      if (!isNaN(val)) sum += val;
+    });
+    return sum;
+  };
+
+  const getDurationSum = (behavior, col) => {
+    let sum = 0;
+    AVAILABLE_DIMENSIONS["Duration"].forEach(dur => {
+      const val = parseInt(trackerData[`${behavior}_${dur}_${col}`], 10);
+      if (!isNaN(val)) sum += val;
+    });
+    return sum;
+  };
+
   if (currentView === 'tracker') {
     const columns = setting === "Education" ? EDUCATION_DAYS : RESIDENTIAL_SHIFTS;
     return (
@@ -163,7 +181,7 @@ function App() {
               <tr>
                 <td><strong>Date:</strong></td>
                 {columns.map(col => (
-                  <td key={col}>
+                  <td key={col} style={{ padding: '0.25rem' }}>
                     <input 
                       type="date" 
                       className="table-input" 
@@ -185,7 +203,23 @@ function App() {
                 return (
                   <React.Fragment key={behavior}>
                     <tr style={{ backgroundColor: bgColor }}>
-                      <td colSpan={columns.length + 1} style={{ textAlign: 'center', fontWeight: 'bold' }}>{behavior}</td>
+                      <td style={{ fontWeight: 'bold', paddingLeft: '10px' }}>{behavior}</td>
+                      {columns.map(col => {
+                        const hasBoth = dims.includes("Intensity") && dims.includes("Duration");
+                        let warningText = '';
+                        if (hasBoth) {
+                          const iSum = getIntensitySum(behavior, col);
+                          const dSum = getDurationSum(behavior, col);
+                          if (iSum !== dSum && (iSum > 0 || dSum > 0)) {
+                            warningText = `Mismatch (Int: ${iSum}, Dur: ${dSum})`;
+                          }
+                        }
+                        return (
+                          <td key={col} style={{ textAlign: 'center', color: '#ef4444', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                            {warningText}
+                          </td>
+                        );
+                      })}
                     </tr>
                     {subRows.map(sub => (
                       <tr key={`${behavior}_${sub}`}>
