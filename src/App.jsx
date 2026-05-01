@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Table, Plus, Minus, Trash2, Shield, Activity, User, ArrowLeft, Download, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Table, Plus, Minus, Trash2, Shield, Activity, User, ArrowLeft, Download, AlertTriangle, CheckCircle, Eraser, RotateCcw } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import tcfdLogo from './assets/tcfd.jpg';
 
@@ -67,20 +67,32 @@ const RockerInput = ({ value, onChange }) => {
 
 function App() {
   const [currentView, setCurrentView] = useState('setup');
-  const [clientName, setClientName] = useState('Test 8.0.2');
-  const [setting, setSetting] = useState('Education');
+  const [clientName, setClientName] = useState('');
+  const [setting, setSetting] = useState('');
   const [educationPeriod, setEducationPeriod] = useState('daily');
   const [selectedBehaviorInput, setSelectedBehaviorInput] = useState('');
-  const [targetBehaviors, setTargetBehaviors] = useState(['Self-Injury', 'Aggression']);
-  const [behaviorDimensions, setBehaviorDimensions] = useState({
-    'Self-Injury': ['Intensity', 'Duration'],
-    'Aggression': ['Intensity', 'Duration']
-  });
-  const [selectedManeuvers, setSelectedManeuvers] = useState(new Set([
-    'Touch/Touch with a Grasp', 'Front Deflection', 'One Person Escort', 'Two Person Take Down'
-  ]));
+  const [targetBehaviors, setTargetBehaviors] = useState([]);
+  const [behaviorDimensions, setBehaviorDimensions] = useState({});
+  const [selectedManeuvers, setSelectedManeuvers] = useState(new Set());
   const [exportModal, setExportModal] = useState(null); // null | { errors: [] } | 'success'
   const [trackerData, setTrackerData] = useState({});
+
+  const clearTrackerData = () => {
+    if (confirm("Are you sure you want to clear all entered data? This cannot be undone.")) {
+      setTrackerData({});
+    }
+  };
+
+  const resetSetup = () => {
+    if (confirm("Are you sure you want to reset the configuration? This will clear all selected behaviors and settings.")) {
+      setClientName('');
+      setSetting('');
+      setTargetBehaviors([]);
+      setBehaviorDimensions({});
+      setSelectedManeuvers(new Set());
+      setTrackerData({});
+    }
+  };
 
   const addBehavior = () => {
     if (selectedBehaviorInput && !targetBehaviors.includes(selectedBehaviorInput)) {
@@ -286,6 +298,9 @@ function App() {
                 ))}
               </div>
             )}
+            <button className="btn-danger" onClick={clearTrackerData} style={{ padding: '0.75rem 1.5rem', fontWeight: '600' }}>
+              <Eraser size={18} /> Clear Data
+            </button>
             <button className="btn-orange" onClick={handleExport}>
               <Download size={18} /> Export to Excel
             </button>
@@ -560,7 +575,10 @@ function App() {
               ))}
             </div>
 
-            <div className="generate-area">
+            <div className="generate-area" style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+              <button className="btn-orange-outline large" onClick={resetSetup}>
+                <RotateCcw size={24} /> Reset Configuration
+              </button>
               <button className="btn-orange large" onClick={openTracker}>
                 <Table size={24} /> Open Data Tracker
               </button>
