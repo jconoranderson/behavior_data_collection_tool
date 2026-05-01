@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Table, Plus, Minus, Trash2, Shield, Activity, User, ArrowLeft, Download, AlertTriangle, CheckCircle, Eraser, RotateCcw } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import tcfdLogo from './assets/tcfd.jpg';
@@ -66,16 +66,42 @@ const RockerInput = ({ value, onChange }) => {
 };
 
 function App() {
-  const [currentView, setCurrentView] = useState('setup');
-  const [clientName, setClientName] = useState('');
-  const [setting, setSetting] = useState('');
-  const [educationPeriod, setEducationPeriod] = useState('daily');
+  const loadState = (key, defaultValue) => {
+    try {
+      const saved = localStorage.getItem(`behaviorTracker_${key}`);
+      if (saved !== null) {
+        if (key === 'selectedManeuvers') {
+          return new Set(JSON.parse(saved));
+        }
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.warn("Failed to load from local storage", e);
+    }
+    return defaultValue;
+  };
+
+  const [currentView, setCurrentView] = useState(() => loadState('currentView', 'setup'));
+  const [clientName, setClientName] = useState(() => loadState('clientName', ''));
+  const [setting, setSetting] = useState(() => loadState('setting', ''));
+  const [educationPeriod, setEducationPeriod] = useState(() => loadState('educationPeriod', 'daily'));
   const [selectedBehaviorInput, setSelectedBehaviorInput] = useState('');
-  const [targetBehaviors, setTargetBehaviors] = useState([]);
-  const [behaviorDimensions, setBehaviorDimensions] = useState({});
-  const [selectedManeuvers, setSelectedManeuvers] = useState(new Set());
+  const [targetBehaviors, setTargetBehaviors] = useState(() => loadState('targetBehaviors', []));
+  const [behaviorDimensions, setBehaviorDimensions] = useState(() => loadState('behaviorDimensions', {}));
+  const [selectedManeuvers, setSelectedManeuvers] = useState(() => loadState('selectedManeuvers', new Set()));
   const [exportModal, setExportModal] = useState(null); // null | { errors: [] } | 'success'
-  const [trackerData, setTrackerData] = useState({});
+  const [trackerData, setTrackerData] = useState(() => loadState('trackerData', {}));
+
+  useEffect(() => {
+    localStorage.setItem('behaviorTracker_currentView', JSON.stringify(currentView));
+    localStorage.setItem('behaviorTracker_clientName', JSON.stringify(clientName));
+    localStorage.setItem('behaviorTracker_setting', JSON.stringify(setting));
+    localStorage.setItem('behaviorTracker_educationPeriod', JSON.stringify(educationPeriod));
+    localStorage.setItem('behaviorTracker_targetBehaviors', JSON.stringify(targetBehaviors));
+    localStorage.setItem('behaviorTracker_behaviorDimensions', JSON.stringify(behaviorDimensions));
+    localStorage.setItem('behaviorTracker_selectedManeuvers', JSON.stringify(Array.from(selectedManeuvers)));
+    localStorage.setItem('behaviorTracker_trackerData', JSON.stringify(trackerData));
+  }, [currentView, clientName, setting, educationPeriod, targetBehaviors, behaviorDimensions, selectedManeuvers, trackerData]);
 
   const clearTrackerData = () => {
     if (confirm("Are you sure you want to clear all entered data? This cannot be undone.")) {
