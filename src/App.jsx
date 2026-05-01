@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Table, Plus, Minus, Trash2, Shield, Activity, User, ArrowLeft } from 'lucide-react';
+import { Table, Plus, Minus, Trash2, Shield, Activity, User, ArrowLeft, Download, AlertTriangle, CheckCircle } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import tcfdLogo from './assets/tcfd.jpg';
 
 const AVAILABLE_BEHAVIORS = [
@@ -20,16 +21,16 @@ const AVAILABLE_DIMENSIONS = {
 
 const SCIPR_CATEGORIES = {
   "Core Techniques": [
-    "Touch/Touch with a Grasp", "Back Hair Pull Stabilization / Release", "Front Deflection", 
-    "Back Hair Pull Stabilization / Release with Assistance", "Bite Release", "Blocking Punches", 
-    "One Arm Release", "Approach Prevention", "Two Arm Release", "Front Arm Catch", 
-    "Front Choke Windmill Release", "Front Kick Avoidance/Deflection", "Back Choke Release", 
+    "Touch/Touch with a Grasp", "Back Hair Pull Stabilization / Release", "Front Deflection",
+    "Back Hair Pull Stabilization / Release with Assistance", "Bite Release", "Blocking Punches",
+    "One Arm Release", "Approach Prevention", "Two Arm Release", "Front Arm Catch",
+    "Front Choke Windmill Release", "Front Kick Avoidance/Deflection", "Back Choke Release",
     "Protection from Thrown Objects", "Front Hair Pull Stabilization / Release"
   ],
   "Specialized Techniques": [
-    "One Person Escort", "Standing Wrap", "One Person Escort – Seated Variation", 
-    "Bite Prevention Front Hold", "Two Person Escort", "Front Choke Release", 
-    "Two Person Escort – Seated Variation", "One Person Wrap / Removal", 
+    "One Person Escort", "Standing Wrap", "One Person Escort – Seated Variation",
+    "Bite Prevention Front Hold", "Two Person Escort", "Front Choke Release",
+    "Two Person Escort – Seated Variation", "One Person Wrap / Removal",
     "Arm Control by One Person or With Assistance", "Two Person Removal"
   ],
   "Restrictive Techniques": [
@@ -37,7 +38,10 @@ const SCIPR_CATEGORIES = {
   ]
 };
 
-const EDUCATION_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+const EDUCATION_PERIODS = {
+  daily: [""],
+  weekly: ["Day 1", "Day 2", "Day 3", "Day 4", "Day 5", "Day 6", "Day 7"]
+};
 const RESIDENTIAL_SHIFTS = ["7-3", "3-11", "11-7"];
 
 const RockerInput = ({ value, onChange }) => {
@@ -47,12 +51,12 @@ const RockerInput = ({ value, onChange }) => {
       <button className="rocker-btn" onClick={() => onChange(Math.max(0, val - 1))}>
         <Minus size={14} />
       </button>
-      <input 
-        type="number" 
+      <input
+        type="number"
         min="0"
-        className="table-input rocker-field" 
-        value={value} 
-        onChange={e => onChange(e.target.value)} 
+        className="table-input rocker-field"
+        value={value}
+        onChange={e => onChange(e.target.value)}
       />
       <button className="rocker-btn" onClick={() => onChange(val + 1)}>
         <Plus size={14} />
@@ -65,6 +69,7 @@ function App() {
   const [currentView, setCurrentView] = useState('setup');
   const [clientName, setClientName] = useState('Test 8.0.2');
   const [setting, setSetting] = useState('Education');
+  const [educationPeriod, setEducationPeriod] = useState('daily');
   const [selectedBehaviorInput, setSelectedBehaviorInput] = useState('');
   const [targetBehaviors, setTargetBehaviors] = useState(['Self-Injury', 'Aggression']);
   const [behaviorDimensions, setBehaviorDimensions] = useState({
@@ -74,6 +79,7 @@ function App() {
   const [selectedManeuvers, setSelectedManeuvers] = useState(new Set([
     'Touch/Touch with a Grasp', 'Front Deflection', 'One Person Escort', 'Two Person Take Down'
   ]));
+  const [exportModal, setExportModal] = useState(null); // null | { errors: [] } | 'success'
   const [trackerData, setTrackerData] = useState({});
 
   const addBehavior = () => {
@@ -152,7 +158,109 @@ function App() {
   };
 
   if (currentView === 'tracker') {
-    const columns = setting === "Education" ? EDUCATION_DAYS : RESIDENTIAL_SHIFTS;
+    const columns = setting === "Education" ? EDUCATION_PERIODS[educationPeriod] : RESIDENTIAL_SHIFTS;
+
+    const formatDateParts = (dateStr) => {
+      if (!dateStr) return null;
+      const [y, mo, d] = dateStr.split('-').map(Number);
+      const dt = new Date(y, mo - 1, d);
+      return {
+        weekday: dt.toLocaleDateString('en-US', { weekday: 'long' }),
+        longDate: dt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+      };
+    };
+
+    // ── Validation ────────────────────────────────────────────────
+    const validateData = () => {
+      const errors = [];
+
+      // 1. Must have at least one numeric entry > 0
+      const hasAnyData = Object.entries(trackerData).some(([k, v]) => {
+        if (k.startsWith('Date_') || k.startsWith('Comments_')) return false;
+        const n = parseInt(v, 10);
+        return !isNaN(n) && n > 0;
+      });
+      if (!hasAnyData) {
+        errors.push('No behavior data has been entered.');
+        return errors;
+      }
+
+      // 2. Intensity / Duration totals must match per column per behavior
+      targetBehaviors.forEach(behavior => {
+        const dims = behaviorDimensions[behavior] || [];
+        if (!dims.includes('Intensity') || !dims.includes('Duration')) return;
+        columns.forEach((col, i) => {
+          const iSum = getIntensitySum(behavior, i);
+          const dSum = getDurationSum(behavior, i);
+          if ((iSum > 0 || dSum > 0) && iSum !== dSum) {
+            const colLabel = formatDateParts(trackerData[`Date_${i}`])?.longDate || col || `Column ${i + 1}`;
+            errors.push(`${behavior} — ${colLabel}: Intensity total (${iSum}) does not match Duration total (${dSum}).`);
+          }
+        });
+      });
+
+      return errors;
+    };
+
+    // ── XLSX Export ───────────────────────────────────────────────
+    const handleExport = () => {
+      const errors = validateData();
+      if (errors.length > 0) {
+        setExportModal({ errors });
+        return;
+      }
+      exportXLSX();
+    };
+
+    const exportXLSX = () => {
+      const colHeaders = columns.map((col, i) => {
+        const parts = formatDateParts(trackerData[`Date_${i}`]);
+        if (parts) return `${parts.weekday}\n${parts.longDate}`;
+        return col || 'Date';
+      });
+
+      const rows = [];
+      rows.push([`BEHAVIOR DATA SHEET — ${clientName}`, ...Array(columns.length).fill('')]);
+      rows.push([`Setting: ${setting}${setting === 'Education' ? ` (${educationPeriod})` : ''}`, ...Array(columns.length).fill('')]);
+      rows.push([]);
+      rows.push(['', ...colHeaders]);
+      rows.push(['Date', ...columns.map((_, i) => trackerData[`Date_${i}`] || '')]);
+
+      targetBehaviors.forEach(behavior => {
+        const dims = behaviorDimensions[behavior] || [];
+        const subRows = dims.flatMap(dim => AVAILABLE_DIMENSIONS[dim] || []);
+        rows.push([behavior, ...Array(columns.length).fill('')]);
+        subRows.forEach(sub => {
+          rows.push([`  ${sub}`, ...columns.map((_, i) => {
+            const v = parseInt(trackerData[`${behavior}_${sub}_${i}`], 10);
+            return isNaN(v) ? '' : v;
+          })]);
+        });
+      });
+
+      if (selectedManeuvers.size > 0) {
+        rows.push([]);
+        rows.push(['SCIP-R Maneuvers', ...Array(columns.length).fill('')]);
+        Array.from(selectedManeuvers).forEach(m => {
+          rows.push([`  ${m}`, ...columns.map((_, i) => {
+            const v = parseInt(trackerData[`SCIP_${m}_${i}`], 10);
+            return isNaN(v) ? '' : v;
+          })]);
+        });
+      }
+
+      rows.push([]);
+      rows.push(['Comments', ...columns.map((_, i) => trackerData[`Comments_${i}`] || '')]);
+
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      ws['!cols'] = [{ wch: 35 }, ...columns.map(() => ({ wch: 22 }))];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Behavior Data');
+      const filename = `BehaviorData_${clientName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      XLSX.writeFile(wb, filename);
+      setExportModal('success');
+    };
+
     return (
       <div className="tracker-view">
         <div className="tracker-header">
@@ -164,9 +272,27 @@ function App() {
             <span>Client: {clientName}</span>
             <span>Setting: {setting}</span>
           </div>
-          <button onClick={() => setCurrentView('setup')} className="btn-orange-outline">
-            <ArrowLeft size={20} /> Back to Setup
-          </button>
+          <div className="tracker-controls">
+            {setting === 'Education' && (
+              <div className="period-toggle">
+                {['daily', 'weekly'].map(p => (
+                  <button
+                    key={p}
+                    className={`period-btn${educationPeriod === p ? ' active' : ''}`}
+                    onClick={() => setEducationPeriod(p)}
+                  >
+                    {p.charAt(0).toUpperCase() + p.slice(1)}
+                  </button>
+                ))}
+              </div>
+            )}
+            <button className="btn-orange" onClick={handleExport}>
+              <Download size={18} /> Export to Excel
+            </button>
+            <button onClick={() => setCurrentView('setup')} className="btn-orange-outline">
+              <ArrowLeft size={20} /> Back to Setup
+            </button>
+          </div>
         </div>
 
         <div className="table-container">
@@ -174,19 +300,33 @@ function App() {
             <thead>
               <tr>
                 <th style={{ width: '250px' }}></th>
-                {columns.map(col => <th key={col}>{col}</th>)}
+                {columns.map((col, i) => {
+                  const parts = formatDateParts(trackerData[`Date_${i}`]);
+                  return (
+                    <th key={i}>
+                      {parts ? (
+                        <>
+                          <div style={{ fontWeight: 700 }}>{parts.weekday}</div>
+                          <div style={{ fontWeight: 400, fontSize: '0.85rem' }}>{parts.longDate}</div>
+                        </>
+                      ) : (
+                        <div>{col || 'Date'}</div>
+                      )}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
               <tr>
                 <td><strong>Date:</strong></td>
-                {columns.map(col => (
-                  <td key={col} style={{ padding: '0.25rem' }}>
-                    <input 
-                      type="date" 
-                      className="table-input" 
-                      value={trackerData[`Date_${col}`] || ''} 
-                      onChange={e => handleCellChange('Date', col, e.target.value)} 
+                {columns.map((col, i) => (
+                  <td key={i} style={{ padding: '0.25rem' }}>
+                    <input
+                      type="date"
+                      className="table-input"
+                      value={trackerData[`Date_${i}`] || ''}
+                      onChange={e => handleCellChange('Date', i, e.target.value)}
                     />
                   </td>
                 ))}
@@ -204,18 +344,18 @@ function App() {
                   <React.Fragment key={behavior}>
                     <tr style={{ backgroundColor: bgColor }}>
                       <td style={{ fontWeight: 'bold', paddingLeft: '10px' }}>{behavior}</td>
-                      {columns.map(col => {
+                      {columns.map((col, i) => {
                         const hasBoth = dims.includes("Intensity") && dims.includes("Duration");
                         let warningText = '';
                         if (hasBoth) {
-                          const iSum = getIntensitySum(behavior, col);
-                          const dSum = getDurationSum(behavior, col);
+                          const iSum = getIntensitySum(behavior, i);
+                          const dSum = getDurationSum(behavior, i);
                           if (iSum !== dSum && (iSum > 0 || dSum > 0)) {
                             warningText = `Mismatch (Int: ${iSum}, Dur: ${dSum})`;
                           }
                         }
                         return (
-                          <td key={col} style={{ textAlign: 'center', color: '#ef4444', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                          <td key={i} style={{ textAlign: 'center', color: '#ef4444', fontWeight: 'bold', fontSize: '0.8rem' }}>
                             {warningText}
                           </td>
                         );
@@ -224,11 +364,11 @@ function App() {
                     {subRows.map(sub => (
                       <tr key={`${behavior}_${sub}`}>
                         <td style={{ paddingLeft: '20px', fontStyle: 'italic', backgroundColor: '#f8f8f8' }}>{sub}</td>
-                        {columns.map(col => (
-                          <td key={col} style={{ backgroundColor: '#fff', padding: '0.25rem' }}>
-                            <RockerInput 
-                              value={trackerData[`${behavior}_${sub}_${col}`] || ''} 
-                              onChange={val => handleCellChange(`${behavior}_${sub}`, col, val)}
+                        {columns.map((col, i) => (
+                          <td key={i} style={{ backgroundColor: '#fff', padding: '0.25rem' }}>
+                            <RockerInput
+                              value={trackerData[`${behavior}_${sub}_${i}`] || ''}
+                              onChange={val => handleCellChange(`${behavior}_${sub}`, i, val)}
                             />
                           </td>
                         ))}
@@ -246,11 +386,11 @@ function App() {
                   {Array.from(selectedManeuvers).map(m => (
                     <tr key={m}>
                       <td style={{ paddingLeft: '20px', fontStyle: 'italic', backgroundColor: '#fffadc' }}>{m}</td>
-                      {columns.map(col => (
-                        <td key={col} style={{ backgroundColor: '#fff', padding: '0.25rem' }}>
-                          <RockerInput 
-                            value={trackerData[`SCIP_${m}_${col}`] || ''} 
-                            onChange={val => handleCellChange(`SCIP_${m}`, col, val)}
+                      {columns.map((col, i) => (
+                        <td key={i} style={{ backgroundColor: '#fff', padding: '0.25rem' }}>
+                          <RockerInput
+                            value={trackerData[`SCIP_${m}_${i}`] || ''}
+                            onChange={val => handleCellChange(`SCIP_${m}`, i, val)}
                           />
                         </td>
                       ))}
@@ -261,13 +401,13 @@ function App() {
 
               <tr>
                 <td><strong>Comments:</strong></td>
-                {columns.map(col => (
-                  <td key={col} style={{ backgroundColor: '#fff' }}>
-                    <textarea 
-                      className="table-input" 
+                {columns.map((col, i) => (
+                  <td key={i} style={{ backgroundColor: '#fff' }}>
+                    <textarea
+                      className="table-input"
                       style={{ minHeight: '80px', resize: 'vertical' }}
-                      value={trackerData[`Comments_${col}`] || ''} 
-                      onChange={e => handleCellChange('Comments', col, e.target.value)} 
+                      value={trackerData[`Comments_${i}`] || ''}
+                      onChange={e => handleCellChange('Comments', i, e.target.value)}
                     />
                   </td>
                 ))}
@@ -275,7 +415,33 @@ function App() {
             </tbody>
           </table>
         </div>
-      </div>
+
+      {/* Export Modal */}
+      {exportModal && (
+        <div className="modal-overlay" onClick={() => setExportModal(null)}>
+          <div className="modal-box" onClick={e => e.stopPropagation()}>
+            {exportModal === 'success' ? (
+              <>
+                <div className="modal-icon success"><CheckCircle size={36} /></div>
+                <h3 className="modal-title">Export Successful</h3>
+                <p className="modal-body">Your spreadsheet has been downloaded.</p>
+                <button className="btn-orange" onClick={() => setExportModal(null)}>Done</button>
+              </>
+            ) : (
+              <>
+                <div className="modal-icon error"><AlertTriangle size={36} /></div>
+                <h3 className="modal-title">Cannot Export — Validation Failed</h3>
+                <p className="modal-body">Please fix the following issues before exporting:</p>
+                <ul className="modal-errors">
+                  {exportModal.errors.map((e, i) => <li key={i}>{e}</li>)}
+                </ul>
+                <button className="btn-orange-outline" onClick={() => setExportModal(null)}>Close</button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
     );
   }
 
@@ -297,19 +463,19 @@ function App() {
               <div className="input-group">
                 <div className="form-group" style={{ flex: 1 }}>
                   <label className="form-label">Client Name</label>
-                  <input 
-                    type="text" 
-                    className="form-control" 
+                  <input
+                    type="text"
+                    className="form-control"
                     placeholder="e.g. John Doe"
-                    value={clientName} 
-                    onChange={e => setClientName(e.target.value)} 
+                    value={clientName}
+                    onChange={e => setClientName(e.target.value)}
                   />
                 </div>
                 <div className="form-group" style={{ flex: 1 }}>
                   <label className="form-label">Setting</label>
-                  <select 
-                    className="form-control" 
-                    value={setting} 
+                  <select
+                    className="form-control"
+                    value={setting}
                     onChange={e => setSetting(e.target.value)}
                   >
                     <option value="">Select Setting</option>
@@ -324,7 +490,7 @@ function App() {
               <h2 className="section-title"><Activity size={24} /> Target Behaviors</h2>
               <div className="input-group" style={{ alignItems: 'flex-end' }}>
                 <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-                  <select 
+                  <select
                     className="form-control"
                     value={selectedBehaviorInput}
                     onChange={e => setSelectedBehaviorInput(e.target.value)}
@@ -355,8 +521,8 @@ function App() {
                         <div className="dimensions-grid">
                           {Object.keys(AVAILABLE_DIMENSIONS).map(dim => (
                             <label key={dim} className="checkbox-label">
-                              <input 
-                                type="checkbox" 
+                              <input
+                                type="checkbox"
                                 className="checkbox-input"
                                 checked={(behaviorDimensions[behavior] || []).includes(dim)}
                                 onChange={() => toggleDimension(behavior, dim)}
@@ -380,8 +546,8 @@ function App() {
                   <div className="maneuvers-grid">
                     {maneuvers.map(maneuver => (
                       <label key={maneuver} className="checkbox-label">
-                        <input 
-                          type="checkbox" 
+                        <input
+                          type="checkbox"
                           className="checkbox-input"
                           checked={selectedManeuvers.has(maneuver)}
                           onChange={() => toggleManeuver(maneuver)}

@@ -456,3 +456,106 @@ select.form-control {
 .rocker-field[type=number] {
   -moz-appearance: textfield;
 }
+
+/* Education Period Toggle */
+.period-toggle {
+  display: flex;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  overflow: hidden;
+  height: 46px; /* matches form-control height */
+}
+
+.period-btn {
+  flex: 1;
+  border: none;
+  background: #f9fafb;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  border-right: 1px solid var(--border-color);
+}
+
+.period-btn:last-child {
+  border-right: none;
+}
+
+.period-btn:hover {
+  background: rgba(244, 132, 58, 0.08);
+  color: var(--primary);
+}
+
+.period-btn.active {
+  background: var(--primary);
+  color: white;
+  font-weight: 600;
+}
+
+/* Tracker header right-side controls */
+.tracker-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* Export Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(2px);
+}
+
+.modal-box {
+  background: white;
+  border-radius: 12px;
+  padding: 2.5rem;
+  max-width: 480px;
+  width: 90%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  text-align: center;
+  animation: modalIn 0.2s ease;
+}
+
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.95) translateY(-10px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.modal-icon {
+  margin-bottom: 1rem;
+}
+.modal-icon.success { color: #22c55e; }
+.modal-icon.error   { color: #ef4444; }
+
+.modal-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+  color: var(--text-main);
+}
+
+.modal-body {
+  color: var(--text-muted);
+  margin-bottom: 1.25rem;
+  font-size: 0.95rem;
+}
+
+.modal-errors {
+  text-align: left;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 1rem 1rem 1rem 1.75rem;
+  margin-bottom: 1.5rem;
+  color: #991b1b;
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
