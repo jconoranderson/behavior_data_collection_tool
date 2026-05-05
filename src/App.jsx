@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Table, Plus, Minus, Trash2, Shield, Activity, User, ArrowLeft, Download, AlertTriangle, CheckCircle, Eraser, RotateCcw, Cloud, CloudUpload, CloudDownload, Save, UserPlus } from 'lucide-react';
+import { Table, Plus, Minus, Trash2, Shield, Activity, User, ArrowLeft, Download, AlertTriangle, CheckCircle, Eraser, RotateCcw, Cloud, CloudUpload, CloudDownload, Save, UserPlus, Calendar } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import tcfdLogo from './assets/tcfd.jpg';
 
@@ -40,6 +40,13 @@ const SCIPR_CATEGORIES = {
 
 const SHIFTS = ["7am-3pm (Education)", "3pm-11pm", "11pm-7am"];
 
+const getLocalISODate = (date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 const RockerInput = ({ value, onChange }) => {
   const val = value ? parseInt(value, 10) : 0;
   return (
@@ -69,6 +76,9 @@ function App() {
         if (key === 'draftManeuvers') {
           return new Set(JSON.parse(saved));
         }
+        if (key === 'reviewMonth') {
+          return new Date(JSON.parse(saved));
+        }
         return JSON.parse(saved);
       }
     } catch (e) {
@@ -97,10 +107,13 @@ function App() {
   const [activeClientId, setActiveClientId] = useState(() => loadState('activeClientId', ''));
   const [activeDate, setActiveDate] = useState(() => {
     const today = new Date();
-    return today.toISOString().slice(0, 10);
+    return getLocalISODate(today);
   });
   const [activeShift, setActiveShift] = useState(SHIFTS[0]);
   const [currentEntryData, setCurrentEntryData] = useState({});
+
+  // Review Page State
+  const [reviewMonth, setReviewMonth] = useState(() => loadState('reviewMonth', new Date()));
 
   // Cloud Sync State
   const [githubToken, setGithubToken] = useState(() => loadState('githubToken', ''));
@@ -121,12 +134,13 @@ function App() {
     
     localStorage.setItem('behaviorTracker_historyData', JSON.stringify(historyData));
     localStorage.setItem('behaviorTracker_activeClientId', JSON.stringify(activeClientId));
+    localStorage.setItem('behaviorTracker_reviewMonth', JSON.stringify(reviewMonth.toISOString()));
     localStorage.setItem('behaviorTracker_githubToken', JSON.stringify(githubToken));
     localStorage.setItem('behaviorTracker_gistId', JSON.stringify(gistId));
   }, [
     currentView, residenceName, clients, 
     draftName, draftBehaviors, draftDimensions, draftManeuvers, 
-    historyData, activeClientId, githubToken, gistId
+    historyData, activeClientId, reviewMonth, githubToken, gistId
   ]);
 
   // Load entry data when client, date, or shift changes
@@ -472,6 +486,99 @@ function App() {
     setExportModal('success');
   };
 
+  if (currentView === 'review') {
+    const year = reviewMonth.getFullYear();
+    const month = reviewMonth.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const firstDay = new Date(year, month, 1).getDay();
+
+    const days = [];
+    for (let i = 0; i < firstDay; i++) days.push(null);
+    for (let i = 1; i <= daysInMonth; i++) days.push(new Date(year, month, i));
+
+    const monthNames = ["January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+
+    return (
+      <div className="tracker-view">
+        <div className="tracker-header">
+          <div className="tracker-brand">
+            <img src={tcfdLogo} alt="TCFD Logo" className="nav-logo" />
+            <h2>REVIEW DATA</h2>
+          </div>
+          
+          <div className="tracker-info" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label" style={{ fontSize: '0.8rem' }}>Client</label>
+              <select 
+                className="form-control" 
+                value={activeClientId} 
+                onChange={e => setActiveClientId(e.target.value)}
+                style={{ minWidth: '160px' }}
+              >
+                {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginLeft: '2rem' }}>
+              <button className="btn-orange-outline" onClick={() => setReviewMonth(new Date(year, month - 1, 1))}>&lt; Prev</button>
+              <h3 style={{ margin: 0, minWidth: '160px', textAlign: 'center' }}>{monthNames[month]} {year}</h3>
+              <button className="btn-orange-outline" onClick={() => setReviewMonth(new Date(year, month + 1, 1))}>Next &gt;</button>
+            </div>
+          </div>
+
+          <div className="tracker-controls">
+            <button onClick={() => setCurrentView('tracker')} className="btn-orange">
+              <Table size={20} /> Data Entry
+            </button>
+            <button onClick={() => setCurrentView('setup')} className="btn-orange-outline">
+              <ArrowLeft size={20} /> Back to Setup
+            </button>
+          </div>
+        </div>
+
+        <div className="table-container" style={{ padding: '2rem', backgroundColor: '#f8f9fa' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.5rem' }}>
+            {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(d => (
+              <div key={d} style={{ fontWeight: 'bold', textAlign: 'center', padding: '0.5rem', backgroundColor: '#e2e8f0', borderRadius: '4px', color: '#334155' }}>
+                {d}
+              </div>
+            ))}
+            {days.map((d, i) => {
+              if (!d) return <div key={`empty-${i}`} style={{ minHeight: '100px', backgroundColor: '#f1f5f9', borderRadius: '4px' }} />;
+              
+              const dateStr = getLocalISODate(d);
+              const dayRecords = historyData.filter(r => r.clientId === activeClientId && r.date === dateStr);
+              
+              return (
+                <div key={dateStr} style={{ minHeight: '100px', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '0.5rem', backgroundColor: '#fff', display: 'flex', flexDirection: 'column', cursor: 'pointer' }}
+                     onClick={() => {
+                        setActiveDate(dateStr);
+                        setCurrentView('tracker');
+                     }}>
+                  <div style={{ fontWeight: 'bold', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.25rem', marginBottom: '0.5rem', color: '#475569' }}>
+                    {d.getDate()}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1 }}>
+                    {dayRecords.map(r => (
+                      <div key={r.id} style={{ fontSize: '0.75rem', backgroundColor: '#fed7aa', color: '#9a3412', padding: '0.25rem 0.5rem', borderRadius: '4px', fontWeight: '600' }}>
+                        {r.shift}
+                      </div>
+                    ))}
+                    {dayRecords.length === 0 && (
+                      <div style={{ color: '#cbd5e1', fontSize: '0.75rem', fontStyle: 'italic', marginTop: 'auto' }}>No entries</div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (currentView === 'tracker') {
     return (
       <div className="tracker-view">
@@ -488,6 +595,7 @@ function App() {
                 className="form-control" 
                 value={activeClientId} 
                 onChange={e => setActiveClientId(e.target.value)}
+                style={{ minWidth: '160px' }}
               >
                 {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
@@ -499,6 +607,7 @@ function App() {
                 className="form-control" 
                 value={activeDate}
                 onChange={e => setActiveDate(e.target.value)}
+                style={{ minWidth: '160px' }}
               />
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
@@ -507,6 +616,7 @@ function App() {
                 className="form-control" 
                 value={activeShift}
                 onChange={e => setActiveShift(e.target.value)}
+                style={{ minWidth: '220px' }}
               >
                 {SHIFTS.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
@@ -516,6 +626,9 @@ function App() {
           <div className="tracker-controls">
             <button className="btn-orange" onClick={saveCurrentEntry} style={{ padding: '0.75rem 1.5rem', fontWeight: '600' }}>
               <Save size={18} /> Save Entry
+            </button>
+            <button onClick={() => setCurrentView('review')} className="btn-orange-outline">
+              <Calendar size={20} /> Review Data
             </button>
             <button className="btn-orange-outline" onClick={handleExport}>
               <Download size={18} /> Export Full History
@@ -810,6 +923,9 @@ function App() {
             <div className="generate-area" style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '3rem' }}>
               <button className="btn-orange-outline large" onClick={saveDraftResident}>
                 <UserPlus size={24} /> Add Resident
+              </button>
+              <button className="btn-orange-outline large" onClick={() => setCurrentView('review')}>
+                <Calendar size={24} /> Review Data
               </button>
               <button className="btn-orange large" onClick={openTracker}>
                 <CheckCircle size={24} /> Complete Configuration
