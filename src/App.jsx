@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Table, Plus, Minus, Trash2, Shield, Activity, User, ArrowLeft, Download, AlertTriangle, CheckCircle, Eraser, RotateCcw, Cloud, CloudUpload, CloudDownload, Save } from 'lucide-react';
+import { Table, Plus, Minus, Trash2, Shield, Activity, User, ArrowLeft, Download, AlertTriangle, CheckCircle, Eraser, RotateCcw, Cloud, CloudUpload, CloudDownload, Save, UserPlus } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import tcfdLogo from './assets/tcfd.jpg';
 
@@ -658,8 +658,9 @@ function App() {
 
               <div className="input-group" style={{ alignItems: 'flex-end' }}>
                 <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-                  <label className="form-label">Add Individual Client</label>
+                  <label className="form-label">Add Resident</label>
                   <input
+                    id="add-resident-input"
                     type="text"
                     className="form-control"
                     placeholder="e.g. John Doe"
@@ -669,7 +670,7 @@ function App() {
                   />
                 </div>
                 <button className="btn-orange-outline" onClick={addClient}>
-                  <Plus size={20} /> Add Client
+                  <Plus size={20} /> Add Resident
                 </button>
               </div>
               
@@ -762,11 +763,11 @@ function App() {
             </div>
 
             <div className="generate-area" style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-              <button className="btn-orange-outline large" onClick={resetSetup}>
-                <RotateCcw size={24} /> Reset Configuration
+              <button className="btn-orange-outline large" onClick={() => document.getElementById('add-resident-input')?.focus()}>
+                <UserPlus size={24} /> Add Resident
               </button>
               <button className="btn-orange large" onClick={openTracker}>
-                <Table size={24} /> Open Data Tracker
+                <CheckCircle size={24} /> Complete Configuration
               </button>
             </div>
           </div>
