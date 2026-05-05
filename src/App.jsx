@@ -770,7 +770,7 @@ function App() {
                         <td style={{ paddingLeft: '30px', fontStyle: 'italic', backgroundColor: '#f8f8f8' }}>{sub}</td>
                         <td style={{ backgroundColor: '#fff', padding: '0.5rem', display: 'flex', justifyContent: 'center' }}>
                           <RockerInput
-                            value={currentEntryData[`${behavior}_${sub}`] || ''}
+                            value={currentEntryData[`${behavior}_${sub}`] !== undefined ? currentEntryData[`${behavior}_${sub}`] : ''}
                             onChange={val => handleCellChange(`${behavior}_${sub}`, val)}
                           />
                         </td>
@@ -790,7 +790,7 @@ function App() {
                       <td style={{ paddingLeft: '30px', fontStyle: 'italic', backgroundColor: '#fffadc' }}>{m}</td>
                       <td style={{ backgroundColor: '#fff', padding: '0.5rem', display: 'flex', justifyContent: 'center' }}>
                         <RockerInput
-                          value={currentEntryData[`SCIP_${m}`] || ''}
+                          value={currentEntryData[`SCIP_${m}`] !== undefined ? currentEntryData[`SCIP_${m}`] : ''}
                           onChange={val => handleCellChange(`SCIP_${m}`, val)}
                         />
                       </td>
