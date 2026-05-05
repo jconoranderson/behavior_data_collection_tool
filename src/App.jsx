@@ -48,7 +48,7 @@ const getLocalISODate = (date) => {
 };
 
 const RockerInput = ({ value, onChange }) => {
-  const val = value ? parseInt(value, 10) : 0;
+  const val = value !== '' && value !== undefined ? parseInt(value, 10) : 0;
   return (
     <div className="rocker-input">
       <button className="rocker-btn" onClick={() => onChange(Math.max(0, val - 1))}>
@@ -58,7 +58,7 @@ const RockerInput = ({ value, onChange }) => {
         type="number"
         min="0"
         className="table-input rocker-field"
-        value={value === 0 ? '' : value}
+        value={value === 0 ? '0' : value || ''}
         onChange={e => onChange(e.target.value)}
       />
       <button className="rocker-btn" onClick={() => onChange(val + 1)}>
@@ -354,7 +354,7 @@ function App() {
           );
           
           const isEmpty = Object.keys(nextData).length === 0 || 
-                          Object.values(nextData).every(v => v === '' || v === 0);
+                          Object.values(nextData).every(v => v === '' || v === undefined);
           
           if (isEmpty) {
             if (index !== -1) newHistory.splice(index, 1);
@@ -380,6 +380,40 @@ function App() {
     });
   };
 
+  const markNoBehavior = (behavior) => {
+    const dims = activeDimensions[behavior] || [];
+    const subRows = dims.flatMap(dim => AVAILABLE_DIMENSIONS[dim] || []);
+    
+    setCurrentEntryData(prev => {
+      const nextData = { ...prev };
+      subRows.forEach(sub => {
+        nextData[`${behavior}_${sub}`] = 0;
+      });
+      
+      if (activeClientId && activeDate && activeShift) {
+        setHistoryData(prevHistory => {
+          const newHistory = [...prevHistory];
+          const index = newHistory.findIndex(
+            r => r.clientId === activeClientId && r.date === activeDate && r.shift === activeShift
+          );
+          
+          const record = {
+            id: `${activeClientId}_${activeDate}_${activeShift}`,
+            clientId: activeClientId,
+            date: activeDate,
+            shift: activeShift,
+            data: nextData
+          };
+          if (index !== -1) newHistory[index] = record;
+          else newHistory.push(record);
+          
+          return newHistory;
+        });
+      }
+      return nextData;
+    });
+  };
+
   const getIntensitySum = (behavior, dataObj) => {
     let sum = 0;
     AVAILABLE_DIMENSIONS["Intensity"].forEach(level => {
@@ -398,6 +432,20 @@ function App() {
     return sum;
   };
 
+  const getBehaviorTotal = (behavior, dataObj, dims) => {
+    if (dims.includes("Intensity")) return getIntensitySum(behavior, dataObj);
+    if (dims.includes("Frequency")) {
+      return parseInt(dataObj[`${behavior}_Frequency`], 10) || 0;
+    }
+    let sum = 0;
+    const subRows = dims.flatMap(dim => AVAILABLE_DIMENSIONS[dim] || []);
+    subRows.forEach(sub => {
+      const val = parseInt(dataObj[`${behavior}_${sub}`], 10);
+      if (!isNaN(val)) sum += val;
+    });
+    return sum;
+  };
+
   const validateRecord = (record, clientObj) => {
     const errors = [];
     const { data, date, shift } = record;
@@ -406,11 +454,20 @@ function App() {
     
     behaviors.forEach(behavior => {
       const dims = dimensions[behavior] || [];
-      if (!dims.includes('Intensity') || !dims.includes('Duration')) return;
-      const iSum = getIntensitySum(behavior, data);
-      const dSum = getDurationSum(behavior, data);
-      if ((iSum > 0 || dSum > 0) && iSum !== dSum) {
-        errors.push(`${date} (${shift}): ${behavior} — Intensity total (${iSum}) does not match Duration total (${dSum}).`);
+      const subRows = dims.flatMap(dim => AVAILABLE_DIMENSIONS[dim] || []);
+      
+      // Check if behavior has any data entered (including 0)
+      const hasData = subRows.some(sub => data[`${behavior}_${sub}`] !== undefined && data[`${behavior}_${sub}`] !== '');
+      if (!hasData) {
+        errors.push(`${date} (${shift}): ${behavior} — Missing data. Please enter values or click 'No Behavior'.`);
+      }
+
+      if (dims.includes('Intensity') && dims.includes('Duration')) {
+        const iSum = getIntensitySum(behavior, data);
+        const dSum = getDurationSum(behavior, data);
+        if ((iSum > 0 || dSum > 0) && iSum !== dSum) {
+          errors.push(`${date} (${shift}): ${behavior} — Intensity total (${iSum}) does not match Duration total (${dSum}).`);
+        }
       }
     });
     return errors;
@@ -457,8 +514,9 @@ function App() {
       rows.push([behavior, ...Array(columns.length).fill('')]);
       subRows.forEach(sub => {
         rows.push([`  ${sub}`, ...clientRecords.map(r => {
-          const v = parseInt(r.data[`${behavior}_${sub}`], 10);
-          return isNaN(v) ? '' : v;
+          const val = r.data[`${behavior}_${sub}`];
+          const parsed = parseInt(val, 10);
+          return isNaN(parsed) ? '' : parsed;
         })]);
       });
     });
@@ -468,8 +526,9 @@ function App() {
       rows.push(['SCIP-R Maneuvers', ...Array(columns.length).fill('')]);
       Array.from(activeManeuvers).forEach(m => {
         rows.push([`  ${m}`, ...clientRecords.map(r => {
-          const v = parseInt(r.data[`SCIP_${m}`], 10);
-          return isNaN(v) ? '' : v;
+          const val = r.data[`SCIP_${m}`];
+          const parsed = parseInt(val, 10);
+          return isNaN(parsed) ? '' : parsed;
         })]);
       });
     }
@@ -546,13 +605,13 @@ function App() {
               </div>
             ))}
             {days.map((d, i) => {
-              if (!d) return <div key={`empty-${i}`} style={{ minHeight: '100px', backgroundColor: '#f1f5f9', borderRadius: '4px' }} />;
+              if (!d) return <div key={`empty-${i}`} style={{ minHeight: '120px', backgroundColor: '#f1f5f9', borderRadius: '4px' }} />;
               
               const dateStr = getLocalISODate(d);
               const dayRecords = historyData.filter(r => r.clientId === activeClientId && r.date === dateStr);
               
               return (
-                <div key={dateStr} style={{ minHeight: '100px', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '0.5rem', backgroundColor: '#fff', display: 'flex', flexDirection: 'column', cursor: 'pointer' }}
+                <div key={dateStr} style={{ minHeight: '120px', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '0.5rem', backgroundColor: '#fff', display: 'flex', flexDirection: 'column', cursor: 'pointer' }}
                      onClick={() => {
                         setActiveDate(dateStr);
                         setCurrentView('tracker');
@@ -561,11 +620,30 @@ function App() {
                     {d.getDate()}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1 }}>
-                    {dayRecords.map(r => (
-                      <div key={r.id} style={{ fontSize: '0.75rem', backgroundColor: '#fed7aa', color: '#9a3412', padding: '0.25rem 0.5rem', borderRadius: '4px', fontWeight: '600' }}>
-                        {r.shift}
-                      </div>
-                    ))}
+                    {dayRecords.map(r => {
+                      const totals = activeBehaviors.map(b => {
+                        const dims = activeClientObj?.dimensions[b] || [];
+                        const total = getBehaviorTotal(b, r.data, dims);
+                        return total > 0 ? `${b}: ${total}` : null;
+                      }).filter(Boolean);
+
+                      return (
+                        <div key={r.id} style={{ backgroundColor: '#fff7ed', border: '1px solid #fdba74', borderRadius: '4px', overflow: 'hidden', marginBottom: '4px' }}>
+                          <div style={{ fontSize: '0.7rem', backgroundColor: '#fed7aa', color: '#9a3412', padding: '2px 4px', fontWeight: 'bold' }}>
+                            {r.shift}
+                          </div>
+                          {totals.length > 0 ? (
+                            <div style={{ padding: '2px 4px', fontSize: '0.65rem', color: '#475569' }}>
+                              {totals.map(t => <div key={t}>{t}</div>)}
+                            </div>
+                          ) : (
+                            <div style={{ padding: '2px 4px', fontSize: '0.65rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                              No Behaviors
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                     {dayRecords.length === 0 && (
                       <div style={{ color: '#cbd5e1', fontSize: '0.75rem', fontStyle: 'italic', marginTop: 'auto' }}>No entries</div>
                     )}
@@ -654,8 +732,13 @@ function App() {
                 const subRows = dims.flatMap(dim => AVAILABLE_DIMENSIONS[dim] || []);
 
                 const hasBoth = dims.includes("Intensity") && dims.includes("Duration");
+                
+                const hasData = subRows.some(sub => currentEntryData[`${behavior}_${sub}`] !== undefined && currentEntryData[`${behavior}_${sub}`] !== '');
+                
                 let warningText = '';
-                if (hasBoth) {
+                if (!hasData) {
+                  warningText = '⚠ Missing Data';
+                } else if (hasBoth) {
                   const iSum = getIntensitySum(behavior, currentEntryData);
                   const dSum = getDurationSum(behavior, currentEntryData);
                   if (iSum !== dSum && (iSum > 0 || dSum > 0)) {
@@ -667,8 +750,19 @@ function App() {
                   <React.Fragment key={behavior}>
                     <tr style={{ backgroundColor: bgColor }}>
                       <td style={{ fontWeight: 'bold', paddingLeft: '10px' }}>{behavior}</td>
-                      <td style={{ textAlign: 'center', color: '#ef4444', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                        {warningText}
+                      <td style={{ textAlign: 'center', padding: '0.25rem 0.5rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ color: '#ef4444', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                            {warningText}
+                          </span>
+                          <button 
+                            className="btn-orange-outline" 
+                            style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', backgroundColor: 'rgba(255,255,255,0.7)', border: '1px solid #cbd5e1' }}
+                            onClick={() => markNoBehavior(behavior)}
+                          >
+                            No Behavior
+                          </button>
+                        </div>
                       </td>
                     </tr>
                     {subRows.map(sub => (
