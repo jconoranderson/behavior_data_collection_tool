@@ -66,7 +66,7 @@ function App() {
     try {
       const saved = localStorage.getItem(`behaviorTracker_${key}`);
       if (saved !== null) {
-        if (key === 'selectedManeuvers') {
+        if (key === 'draftManeuvers') {
           return new Set(JSON.parse(saved));
         }
         return JSON.parse(saved);
@@ -78,19 +78,22 @@ function App() {
   };
 
   const [currentView, setCurrentView] = useState(() => loadState('currentView', 'setup'));
-  const [clients, setClients] = useState(() => loadState('clients', []));
-  const [newClientInput, setNewClientInput] = useState('');
   const [residenceName, setResidenceName] = useState(() => loadState('residenceName', ''));
   
-  const [targetBehaviors, setTargetBehaviors] = useState(() => loadState('targetBehaviors', []));
-  const [behaviorDimensions, setBehaviorDimensions] = useState(() => loadState('behaviorDimensions', {}));
-  const [selectedManeuvers, setSelectedManeuvers] = useState(() => loadState('selectedManeuvers', new Set()));
+  // clients is now an array of objects: { id, name, behaviors, dimensions, maneuvers }
+  const [clients, setClients] = useState(() => loadState('clients', []));
+
+  // Draft state for configuring a single resident
+  const [draftName, setDraftName] = useState(() => loadState('draftName', ''));
+  const [draftBehaviors, setDraftBehaviors] = useState(() => loadState('draftBehaviors', []));
+  const [draftDimensions, setDraftDimensions] = useState(() => loadState('draftDimensions', {}));
+  const [draftManeuvers, setDraftManeuvers] = useState(() => loadState('draftManeuvers', new Set()));
   const [selectedBehaviorInput, setSelectedBehaviorInput] = useState('');
 
-  // Longitudinal data: Array of { id, clientId, date, shift, data: { ... } }
+  // Longitudinal data
   const [historyData, setHistoryData] = useState(() => loadState('historyData', []));
 
-  // Active entry state
+  // Active entry state (Tracker)
   const [activeClientId, setActiveClientId] = useState(() => loadState('activeClientId', ''));
   const [activeDate, setActiveDate] = useState(() => {
     const today = new Date();
@@ -108,16 +111,23 @@ function App() {
 
   useEffect(() => {
     localStorage.setItem('behaviorTracker_currentView', JSON.stringify(currentView));
+    localStorage.setItem('behaviorTracker_residenceName', JSON.stringify(residenceName));
     localStorage.setItem('behaviorTracker_clients', JSON.stringify(clients));
-    localStorage.setItem('behaviorTracker_targetBehaviors', JSON.stringify(targetBehaviors));
-    localStorage.setItem('behaviorTracker_behaviorDimensions', JSON.stringify(behaviorDimensions));
-    localStorage.setItem('behaviorTracker_selectedManeuvers', JSON.stringify(Array.from(selectedManeuvers)));
+    
+    localStorage.setItem('behaviorTracker_draftName', JSON.stringify(draftName));
+    localStorage.setItem('behaviorTracker_draftBehaviors', JSON.stringify(draftBehaviors));
+    localStorage.setItem('behaviorTracker_draftDimensions', JSON.stringify(draftDimensions));
+    localStorage.setItem('behaviorTracker_draftManeuvers', JSON.stringify(Array.from(draftManeuvers)));
+    
     localStorage.setItem('behaviorTracker_historyData', JSON.stringify(historyData));
     localStorage.setItem('behaviorTracker_activeClientId', JSON.stringify(activeClientId));
-    localStorage.setItem('behaviorTracker_residenceName', JSON.stringify(residenceName));
     localStorage.setItem('behaviorTracker_githubToken', JSON.stringify(githubToken));
     localStorage.setItem('behaviorTracker_gistId', JSON.stringify(gistId));
-  }, [currentView, clients, targetBehaviors, behaviorDimensions, selectedManeuvers, historyData, activeClientId, residenceName, githubToken, gistId]);
+  }, [
+    currentView, residenceName, clients, 
+    draftName, draftBehaviors, draftDimensions, draftManeuvers, 
+    historyData, activeClientId, githubToken, gistId
+  ]);
 
   // Load entry data when client, date, or shift changes
   useEffect(() => {
@@ -136,7 +146,6 @@ function App() {
   const saveCurrentEntry = () => {
     if (!activeClientId) return;
     
-    // Check if empty
     const isEmpty = Object.keys(currentEntryData).length === 0 || 
                     Object.values(currentEntryData).every(v => v === '' || v === 0);
     
@@ -175,8 +184,8 @@ function App() {
     setSyncStatus('Saving...');
     try {
       const payload = {
-        residenceName, clients, targetBehaviors, behaviorDimensions, 
-        selectedManeuvers: Array.from(selectedManeuvers),
+        residenceName,
+        clients,
         historyData
       };
       
@@ -223,10 +232,21 @@ function App() {
       if (content) {
         const parsed = JSON.parse(content);
         if (parsed.residenceName !== undefined) setResidenceName(parsed.residenceName);
-        if (parsed.clients) setClients(parsed.clients);
-        if (parsed.targetBehaviors) setTargetBehaviors(parsed.targetBehaviors);
-        if (parsed.behaviorDimensions) setBehaviorDimensions(parsed.behaviorDimensions);
-        if (parsed.selectedManeuvers) setSelectedManeuvers(new Set(parsed.selectedManeuvers));
+        
+        // Handle migration from old flat structure to per-resident structure
+        if (parsed.clients && parsed.clients.length > 0 && typeof parsed.clients[0] === 'string') {
+          const migratedClients = parsed.clients.map(name => ({
+            id: name,
+            name: name,
+            behaviors: parsed.targetBehaviors || [],
+            dimensions: parsed.behaviorDimensions || {},
+            maneuvers: parsed.selectedManeuvers || []
+          }));
+          setClients(migratedClients);
+        } else if (parsed.clients) {
+          setClients(parsed.clients);
+        }
+        
         if (parsed.historyData) setHistoryData(parsed.historyData);
         setSyncStatus('Loaded successfully');
         setTimeout(() => setSyncStatus(''), 3000);
@@ -239,38 +259,51 @@ function App() {
     }
   };
 
-  const addClient = () => {
-    if (newClientInput.trim() && !clients.includes(newClientInput.trim())) {
-      setClients([...clients, newClientInput.trim()]);
-      if (!activeClientId) setActiveClientId(newClientInput.trim());
-      setNewClientInput('');
+  const saveDraftResident = () => {
+    if (!draftName.trim()) {
+      alert("Please enter a Resident Name before adding.");
+      return;
     }
+    
+    if (clients.some(c => c.id.toLowerCase() === draftName.trim().toLowerCase())) {
+      alert("A resident with this name already exists.");
+      return;
+    }
+
+    const newClient = {
+      id: draftName.trim(),
+      name: draftName.trim(),
+      behaviors: draftBehaviors,
+      dimensions: draftDimensions,
+      maneuvers: Array.from(draftManeuvers)
+    };
+
+    setClients([...clients, newClient]);
+    if (!activeClientId) setActiveClientId(newClient.id);
+
+    // Clear draft form for next resident
+    setDraftName('');
+    setDraftBehaviors([]);
+    setDraftDimensions({});
+    setDraftManeuvers(new Set());
+    setSelectedBehaviorInput('');
+    
+    alert(`Resident profile for ${newClient.name} has been added!`);
   };
 
-  const removeClient = (c) => {
-    if (confirm(`Are you sure you want to remove ${c}? This won't delete historical data, but removes them from the list.`)) {
-      setClients(clients.filter(client => client !== c));
-      if (activeClientId === c) setActiveClientId(clients[0] || '');
-    }
-  };
-
-  const resetSetup = () => {
-    if (confirm("Are you sure you want to reset the configuration? This will clear all settings and locally saved data.")) {
-      setResidenceName('');
-      setClients([]);
-      setTargetBehaviors([]);
-      setBehaviorDimensions({});
-      setSelectedManeuvers(new Set());
-      setHistoryData([]);
-      setActiveClientId('');
+  const removeClient = (id) => {
+    if (confirm(`Are you sure you want to remove this resident? This won't delete historical data, but removes them from the list.`)) {
+      const remaining = clients.filter(c => c.id !== id);
+      setClients(remaining);
+      if (activeClientId === id) setActiveClientId(remaining[0]?.id || '');
     }
   };
 
   const addBehavior = () => {
-    if (selectedBehaviorInput && !targetBehaviors.includes(selectedBehaviorInput)) {
-      setTargetBehaviors([...targetBehaviors, selectedBehaviorInput]);
-      setBehaviorDimensions({
-        ...behaviorDimensions,
+    if (selectedBehaviorInput && !draftBehaviors.includes(selectedBehaviorInput)) {
+      setDraftBehaviors([...draftBehaviors, selectedBehaviorInput]);
+      setDraftDimensions({
+        ...draftDimensions,
         [selectedBehaviorInput]: []
       });
       setSelectedBehaviorInput('');
@@ -278,44 +311,53 @@ function App() {
   };
 
   const removeBehavior = (behavior) => {
-    setTargetBehaviors(targetBehaviors.filter(b => b !== behavior));
-    const newDims = { ...behaviorDimensions };
+    setDraftBehaviors(draftBehaviors.filter(b => b !== behavior));
+    const newDims = { ...draftDimensions };
     delete newDims[behavior];
-    setBehaviorDimensions(newDims);
+    setDraftDimensions(newDims);
   };
 
   const toggleDimension = (behavior, dimension) => {
-    const dims = behaviorDimensions[behavior] || [];
+    const dims = draftDimensions[behavior] || [];
     let newDims;
     if (dims.includes(dimension)) {
       newDims = dims.filter(d => d !== dimension);
     } else {
       newDims = [...dims, dimension];
     }
-    setBehaviorDimensions({
-      ...behaviorDimensions,
+    setDraftDimensions({
+      ...draftDimensions,
       [behavior]: newDims
     });
   };
 
   const toggleManeuver = (maneuver) => {
-    const newManeuvers = new Set(selectedManeuvers);
+    const newManeuvers = new Set(draftManeuvers);
     if (newManeuvers.has(maneuver)) {
       newManeuvers.delete(maneuver);
     } else {
       newManeuvers.add(maneuver);
     }
-    setSelectedManeuvers(newManeuvers);
+    setDraftManeuvers(newManeuvers);
   };
 
   const openTracker = () => {
-    if (clients.length === 0) {
-      alert("Please add at least one client.");
+    if (clients.length === 0 && !draftName.trim()) {
+      alert("Please configure and add at least one resident.");
       return;
     }
-    if (!activeClientId) setActiveClientId(clients[0]);
+    // If they filled out the draft but forgot to click Add, implicitly add it
+    if (draftName.trim()) {
+      saveDraftResident();
+    }
     setCurrentView('tracker');
   };
+
+  // Tracker Logic Helpers
+  const activeClientObj = clients.find(c => c.id === activeClientId);
+  const activeBehaviors = activeClientObj?.behaviors || [];
+  const activeDimensions = activeClientObj?.dimensions || {};
+  const activeManeuvers = new Set(activeClientObj?.maneuvers || []);
 
   const handleCellChange = (key, value) => {
     setCurrentEntryData(prev => ({
@@ -342,11 +384,14 @@ function App() {
     return sum;
   };
 
-  const validateRecord = (record) => {
+  const validateRecord = (record, clientObj) => {
     const errors = [];
     const { data, date, shift } = record;
-    targetBehaviors.forEach(behavior => {
-      const dims = behaviorDimensions[behavior] || [];
+    const behaviors = clientObj?.behaviors || [];
+    const dimensions = clientObj?.dimensions || {};
+    
+    behaviors.forEach(behavior => {
+      const dims = dimensions[behavior] || [];
       if (!dims.includes('Intensity') || !dims.includes('Duration')) return;
       const iSum = getIntensitySum(behavior, data);
       const dSum = getDurationSum(behavior, data);
@@ -358,10 +403,9 @@ function App() {
   };
 
   const handleExport = () => {
-    if (!activeClientId) return;
+    if (!activeClientObj) return;
 
-    // First validate all records for this client
-    const clientRecords = historyData.filter(r => r.clientId === activeClientId);
+    const clientRecords = historyData.filter(r => r.clientId === activeClientObj.id);
     clientRecords.sort((a, b) => {
       if (a.date !== b.date) return a.date.localeCompare(b.date);
       return SHIFTS.indexOf(a.shift) - SHIFTS.indexOf(b.shift);
@@ -374,7 +418,7 @@ function App() {
 
     const allErrors = [];
     clientRecords.forEach(r => {
-      const errs = validateRecord(r);
+      const errs = validateRecord(r, activeClientObj);
       allErrors.push(...errs);
     });
 
@@ -383,19 +427,18 @@ function App() {
       return;
     }
 
-    // Prepare columns: Date + Shift combinations
     const columns = clientRecords.map(r => `${r.date}\n${r.shift}`);
 
     const rows = [];
-    rows.push([`BEHAVIOR DATA SHEET — ${activeClientId}`, ...Array(columns.length).fill('')]);
+    rows.push([`BEHAVIOR DATA SHEET — ${activeClientObj.name}`, ...Array(columns.length).fill('')]);
     if (residenceName) {
       rows.push([`Residence: ${residenceName}`, ...Array(columns.length).fill('')]);
     }
     rows.push([]);
     rows.push(['Date & Shift', ...columns]);
 
-    targetBehaviors.forEach(behavior => {
-      const dims = behaviorDimensions[behavior] || [];
+    activeBehaviors.forEach(behavior => {
+      const dims = activeDimensions[behavior] || [];
       const subRows = dims.flatMap(dim => AVAILABLE_DIMENSIONS[dim] || []);
       rows.push([behavior, ...Array(columns.length).fill('')]);
       subRows.forEach(sub => {
@@ -406,10 +449,10 @@ function App() {
       });
     });
 
-    if (selectedManeuvers.size > 0) {
+    if (activeManeuvers.size > 0) {
       rows.push([]);
       rows.push(['SCIP-R Maneuvers', ...Array(columns.length).fill('')]);
-      Array.from(selectedManeuvers).forEach(m => {
+      Array.from(activeManeuvers).forEach(m => {
         rows.push([`  ${m}`, ...clientRecords.map(r => {
           const v = parseInt(r.data[`SCIP_${m}`], 10);
           return isNaN(v) ? '' : v;
@@ -424,7 +467,7 @@ function App() {
     ws['!cols'] = [{ wch: 35 }, ...columns.map(() => ({ wch: 22 }))];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Behavior Data');
-    const filename = `BehaviorData_${activeClientId.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    const filename = `BehaviorData_${activeClientObj.name.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`;
     XLSX.writeFile(wb, filename);
     setExportModal('success');
   };
@@ -446,7 +489,7 @@ function App() {
                 value={activeClientId} 
                 onChange={e => setActiveClientId(e.target.value)}
               >
-                {clients.map(c => <option key={c} value={c}>{c}</option>)}
+                {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
@@ -492,12 +535,12 @@ function App() {
               </tr>
             </thead>
             <tbody>
-              {targetBehaviors.map(behavior => {
+              {activeBehaviors.map(behavior => {
                 let bgColor = '#e8e8e8'; 
                 if (behavior === "Aggression") bgColor = '#ffe6e6';
                 if (behavior === "Self-Injury") bgColor = '#e6f3ff';
 
-                const dims = behaviorDimensions[behavior] || [];
+                const dims = activeDimensions[behavior] || [];
                 const subRows = dims.flatMap(dim => AVAILABLE_DIMENSIONS[dim] || []);
 
                 const hasBoth = dims.includes("Intensity") && dims.includes("Duration");
@@ -533,12 +576,12 @@ function App() {
                 );
               })}
 
-              {selectedManeuvers.size > 0 && (
+              {activeManeuvers.size > 0 && (
                 <>
                   <tr style={{ backgroundColor: '#fff9c4' }}>
                     <td colSpan={2} style={{ textAlign: 'center', fontWeight: 'bold' }}>SCIP-R Maneuvers</td>
                   </tr>
-                  {Array.from(selectedManeuvers).map(m => (
+                  {Array.from(activeManeuvers).map(m => (
                     <tr key={m}>
                       <td style={{ paddingLeft: '30px', fontStyle: 'italic', backgroundColor: '#fffadc' }}>{m}</td>
                       <td style={{ backgroundColor: '#fff', padding: '0.5rem', display: 'flex', justifyContent: 'center' }}>
@@ -642,128 +685,130 @@ function App() {
               </div>
             </div>
 
-            <div className="section">
-              <h2 className="section-title"><User size={24} /> Client Residences</h2>
-              
-              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-                <label className="form-label">Residence Name</label>
+            <div className="section" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '2rem', marginBottom: '2rem' }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label" style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>Global Residence Name</label>
                 <input
                   type="text"
                   className="form-control"
                   placeholder="e.g. Oak Street House"
                   value={residenceName}
                   onChange={e => setResidenceName(e.target.value)}
+                  style={{ maxWidth: '400px' }}
                 />
               </div>
+            </div>
 
-              <div className="input-group" style={{ alignItems: 'flex-end' }}>
-                <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-                  <label className="form-label">Add Resident</label>
-                  <input
-                    id="add-resident-input"
-                    type="text"
-                    className="form-control"
-                    placeholder="e.g. John Doe"
-                    value={newClientInput}
-                    onChange={e => setNewClientInput(e.target.value)}
-                    onKeyPress={e => e.key === 'Enter' && addClient()}
-                  />
-                </div>
-                <button className="btn-orange-outline" onClick={addClient}>
-                  <Plus size={20} /> Add Resident
-                </button>
-              </div>
-              
-              {clients.length > 0 && (
-                <div style={{ marginTop: '1rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+            {clients.length > 0 && (
+              <div className="section">
+                <h2 className="section-title"><User size={24} /> Configured Residents</h2>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                   {clients.map(c => (
-                    <div key={c} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#f1f5f9', padding: '0.5rem 1rem', borderRadius: '20px' }}>
-                      <span style={{ fontWeight: '500' }}>{c}</span>
-                      <button onClick={() => removeClient(c)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex' }}>
+                    <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#f1f5f9', padding: '0.75rem 1rem', borderRadius: '20px', border: '1px solid #cbd5e1' }}>
+                      <span style={{ fontWeight: '600' }}>{c.name}</span>
+                      <span style={{ fontSize: '0.8rem', color: '#64748b' }}>({c.behaviors.length} behaviors)</span>
+                      <button onClick={() => removeClient(c.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', marginLeft: '0.5rem' }}>
                         <Trash2 size={16} />
                       </button>
                     </div>
                   ))}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
-            <div className="section">
-              <h2 className="section-title"><Activity size={24} /> Target Behaviors</h2>
-              <div className="input-group" style={{ alignItems: 'flex-end' }}>
-                <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-                  <select
-                    className="form-control"
-                    value={selectedBehaviorInput}
-                    onChange={e => setSelectedBehaviorInput(e.target.value)}
-                  >
-                    <option value="">Select a behavior to add</option>
-                    {AVAILABLE_BEHAVIORS.map(b => (
-                      <option key={b} value={b}>{b}</option>
-                    ))}
-                  </select>
-                </div>
-                <button className="btn-orange-outline" onClick={addBehavior}>
-                  <Plus size={20} /> Add Behavior
-                </button>
+            <div className="section" style={{ border: '2px dashed #cbd5e1', padding: '2rem', borderRadius: '12px', backgroundColor: '#fafafa' }}>
+              <h2 className="section-title" style={{ marginBottom: '1.5rem', color: '#334155' }}><UserPlus size={24} /> Configure New Resident</h2>
+              
+              <div className="form-group">
+                <label className="form-label">Resident Name</label>
+                <input
+                  id="add-resident-input"
+                  type="text"
+                  className="form-control"
+                  placeholder="e.g. John Doe"
+                  value={draftName}
+                  onChange={e => setDraftName(e.target.value)}
+                  style={{ maxWidth: '400px' }}
+                />
               </div>
 
-              {targetBehaviors.length > 0 && (
-                <div className="behavior-list">
-                  {targetBehaviors.map(behavior => (
-                    <div key={behavior} className="behavior-item">
-                      <div className="behavior-header">
-                        <span className="behavior-name">{behavior}</span>
-                        <button className="btn-danger" onClick={() => removeBehavior(behavior)}>
-                          <Trash2 size={16} /> Remove
-                        </button>
-                      </div>
-                      <div>
-                        <label className="form-label" style={{ fontSize: '0.9rem' }}>Dimensions to track:</label>
-                        <div className="dimensions-grid">
-                          {Object.keys(AVAILABLE_DIMENSIONS).map(dim => (
-                            <label key={dim} className="checkbox-label">
-                              <input
-                                type="checkbox"
-                                className="checkbox-input"
-                                checked={(behaviorDimensions[behavior] || []).includes(dim)}
-                                onChange={() => toggleDimension(behavior, dim)}
-                              />
-                              {dim}
-                            </label>
-                          ))}
+              <div style={{ marginTop: '2rem' }}>
+                <h3 className="section-title" style={{ fontSize: '1.1rem' }}><Activity size={20} /> Target Behaviors for {draftName || 'Resident'}</h3>
+                <div className="input-group" style={{ alignItems: 'flex-end', maxWidth: '500px' }}>
+                  <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+                    <select
+                      className="form-control"
+                      value={selectedBehaviorInput}
+                      onChange={e => setSelectedBehaviorInput(e.target.value)}
+                    >
+                      <option value="">Select a behavior to add</option>
+                      {AVAILABLE_BEHAVIORS.map(b => (
+                        <option key={b} value={b}>{b}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <button className="btn-orange-outline" onClick={addBehavior}>
+                    <Plus size={20} /> Add Behavior
+                  </button>
+                </div>
+
+                {draftBehaviors.length > 0 && (
+                  <div className="behavior-list" style={{ marginTop: '1rem' }}>
+                    {draftBehaviors.map(behavior => (
+                      <div key={behavior} className="behavior-item">
+                        <div className="behavior-header">
+                          <span className="behavior-name">{behavior}</span>
+                          <button className="btn-danger" onClick={() => removeBehavior(behavior)}>
+                            <Trash2 size={16} /> Remove
+                          </button>
+                        </div>
+                        <div>
+                          <label className="form-label" style={{ fontSize: '0.9rem' }}>Dimensions to track:</label>
+                          <div className="dimensions-grid">
+                            {Object.keys(AVAILABLE_DIMENSIONS).map(dim => (
+                              <label key={dim} className="checkbox-label">
+                                <input
+                                  type="checkbox"
+                                  className="checkbox-input"
+                                  checked={(draftDimensions[behavior] || []).includes(dim)}
+                                  onChange={() => toggleDimension(behavior, dim)}
+                                />
+                                {dim}
+                              </label>
+                            ))}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="section">
-              <h2 className="section-title"><Shield size={24} /> SCIP-R Maneuvers</h2>
-              {Object.entries(SCIPR_CATEGORIES).map(([category, maneuvers]) => (
-                <div key={category}>
-                  <div className="category-title">{category}</div>
-                  <div className="maneuvers-grid">
-                    {maneuvers.map(maneuver => (
-                      <label key={maneuver} className="checkbox-label">
-                        <input
-                          type="checkbox"
-                          className="checkbox-input"
-                          checked={selectedManeuvers.has(maneuver)}
-                          onChange={() => toggleManeuver(maneuver)}
-                        />
-                        {maneuver}
-                      </label>
                     ))}
                   </div>
-                </div>
-              ))}
+                )}
+              </div>
+
+              <div style={{ marginTop: '2.5rem' }}>
+                <h3 className="section-title" style={{ fontSize: '1.1rem' }}><Shield size={20} /> SCIP-R Maneuvers for {draftName || 'Resident'}</h3>
+                {Object.entries(SCIPR_CATEGORIES).map(([category, maneuvers]) => (
+                  <div key={category}>
+                    <div className="category-title">{category}</div>
+                    <div className="maneuvers-grid">
+                      {maneuvers.map(maneuver => (
+                        <label key={maneuver} className="checkbox-label">
+                          <input
+                            type="checkbox"
+                            className="checkbox-input"
+                            checked={draftManeuvers.has(maneuver)}
+                            onChange={() => toggleManeuver(maneuver)}
+                          />
+                          {maneuver}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            <div className="generate-area" style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-              <button className="btn-orange-outline large" onClick={() => document.getElementById('add-resident-input')?.focus()}>
+            <div className="generate-area" style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '3rem' }}>
+              <button className="btn-orange-outline large" onClick={saveDraftResident}>
                 <UserPlus size={24} /> Add Resident
               </button>
               <button className="btn-orange large" onClick={openTracker}>
