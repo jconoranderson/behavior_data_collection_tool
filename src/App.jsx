@@ -80,6 +80,7 @@ function App() {
   const [currentView, setCurrentView] = useState(() => loadState('currentView', 'setup'));
   const [clients, setClients] = useState(() => loadState('clients', []));
   const [newClientInput, setNewClientInput] = useState('');
+  const [residenceName, setResidenceName] = useState(() => loadState('residenceName', ''));
   
   const [targetBehaviors, setTargetBehaviors] = useState(() => loadState('targetBehaviors', []));
   const [behaviorDimensions, setBehaviorDimensions] = useState(() => loadState('behaviorDimensions', {}));
@@ -113,9 +114,10 @@ function App() {
     localStorage.setItem('behaviorTracker_selectedManeuvers', JSON.stringify(Array.from(selectedManeuvers)));
     localStorage.setItem('behaviorTracker_historyData', JSON.stringify(historyData));
     localStorage.setItem('behaviorTracker_activeClientId', JSON.stringify(activeClientId));
+    localStorage.setItem('behaviorTracker_residenceName', JSON.stringify(residenceName));
     localStorage.setItem('behaviorTracker_githubToken', JSON.stringify(githubToken));
     localStorage.setItem('behaviorTracker_gistId', JSON.stringify(gistId));
-  }, [currentView, clients, targetBehaviors, behaviorDimensions, selectedManeuvers, historyData, activeClientId, githubToken, gistId]);
+  }, [currentView, clients, targetBehaviors, behaviorDimensions, selectedManeuvers, historyData, activeClientId, residenceName, githubToken, gistId]);
 
   // Load entry data when client, date, or shift changes
   useEffect(() => {
@@ -173,7 +175,7 @@ function App() {
     setSyncStatus('Saving...');
     try {
       const payload = {
-        clients, targetBehaviors, behaviorDimensions, 
+        residenceName, clients, targetBehaviors, behaviorDimensions, 
         selectedManeuvers: Array.from(selectedManeuvers),
         historyData
       };
@@ -220,6 +222,7 @@ function App() {
       const content = data.files['behavior_data.json']?.content;
       if (content) {
         const parsed = JSON.parse(content);
+        if (parsed.residenceName !== undefined) setResidenceName(parsed.residenceName);
         if (parsed.clients) setClients(parsed.clients);
         if (parsed.targetBehaviors) setTargetBehaviors(parsed.targetBehaviors);
         if (parsed.behaviorDimensions) setBehaviorDimensions(parsed.behaviorDimensions);
@@ -253,6 +256,7 @@ function App() {
 
   const resetSetup = () => {
     if (confirm("Are you sure you want to reset the configuration? This will clear all settings and locally saved data.")) {
+      setResidenceName('');
       setClients([]);
       setTargetBehaviors([]);
       setBehaviorDimensions({});
@@ -384,6 +388,9 @@ function App() {
 
     const rows = [];
     rows.push([`BEHAVIOR DATA SHEET — ${activeClientId}`, ...Array(columns.length).fill('')]);
+    if (residenceName) {
+      rows.push([`Residence: ${residenceName}`, ...Array(columns.length).fill('')]);
+    }
     rows.push([]);
     rows.push(['Date & Shift', ...columns]);
 
@@ -637,6 +644,18 @@ function App() {
 
             <div className="section">
               <h2 className="section-title"><User size={24} /> Client Residences</h2>
+              
+              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                <label className="form-label">Residence Name</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="e.g. Oak Street House"
+                  value={residenceName}
+                  onChange={e => setResidenceName(e.target.value)}
+                />
+              </div>
+
               <div className="input-group" style={{ alignItems: 'flex-end' }}>
                 <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
                   <label className="form-label">Add Individual Client</label>
