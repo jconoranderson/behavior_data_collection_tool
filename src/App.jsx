@@ -48,18 +48,19 @@ const getLocalISODate = (date) => {
 };
 
 const RockerInput = ({ value, onChange }) => {
-  const val = value !== '' && value !== undefined ? parseInt(value, 10) : 0;
+  const val = value !== '' && value !== undefined && value !== 'NO DATA' ? parseInt(value, 10) : 0;
   return (
     <div className="rocker-input">
       <button className="rocker-btn" onClick={() => onChange(Math.max(0, val - 1))}>
         <Minus size={14} />
       </button>
       <input
-        type="number"
+        type={value === 'NO DATA' ? "text" : "number"}
         min="0"
         className="table-input rocker-field"
         value={value === 0 ? '0' : value || ''}
         onChange={e => onChange(e.target.value)}
+        style={value === 'NO DATA' ? { color: '#ef4444', fontWeight: 'bold', fontSize: '0.75rem', width: '80px', textAlign: 'center' } : {}}
       />
       <button className="rocker-btn" onClick={() => onChange(val + 1)}>
         <Plus size={14} />
@@ -294,6 +295,7 @@ function App() {
     });
   };
 
+
   const markNoBehavior = (behavior) => {
     const dims = activeDimensions[behavior] || [];
     const subRows = dims.flatMap(dim => AVAILABLE_DIMENSIONS[dim] || []);
@@ -302,6 +304,40 @@ function App() {
       const nextData = { ...prev };
       subRows.forEach(sub => {
         nextData[`${behavior}_${sub}`] = 0;
+      });
+      
+      if (activeClientId && activeDate && activeShift) {
+        setHistoryData(prevHistory => {
+          const newHistory = [...prevHistory];
+          const index = newHistory.findIndex(
+            r => r.clientId === activeClientId && r.date === activeDate && r.shift === activeShift
+          );
+          
+          const record = {
+            id: `${activeClientId}_${activeDate}_${activeShift}`,
+            clientId: activeClientId,
+            date: activeDate,
+            shift: activeShift,
+            data: nextData
+          };
+          if (index !== -1) newHistory[index] = record;
+          else newHistory.push(record);
+          
+          return newHistory;
+        });
+      }
+      return nextData;
+    });
+  };
+
+  const markNoData = (behavior) => {
+    const dims = activeDimensions[behavior] || [];
+    const subRows = dims.flatMap(dim => AVAILABLE_DIMENSIONS[dim] || []);
+    
+    setCurrentEntryData(prev => {
+      const nextData = { ...prev };
+      subRows.forEach(sub => {
+        nextData[`${behavior}_${sub}`] = 'NO DATA';
       });
       
       if (activeClientId && activeDate && activeShift) {
@@ -473,6 +509,7 @@ function App() {
       subRows.forEach(sub => {
         rows.push([`  ${sub}`, ...clientRecords.map(r => {
           const val = r.data[`${behavior}_${sub}`];
+          if (val === 'NO DATA') return 'NO DATA';
           const parsed = parseInt(val, 10);
           return isNaN(parsed) ? '' : parsed;
         })]);
@@ -485,6 +522,7 @@ function App() {
       Array.from(activeManeuvers).forEach(m => {
         rows.push([`  ${m}`, ...clientRecords.map(r => {
           const val = r.data[`SCIP_${m}`];
+          if (val === 'NO DATA') return 'NO DATA';
           const parsed = parseInt(val, 10);
           return isNaN(parsed) ? '' : parsed;
         })]);
@@ -710,13 +748,21 @@ function App() {
                         </div>
                       </td>
                       <td style={{ textAlign: 'center', padding: '0.5rem' }}>
-                        <button 
-                          className="btn-orange-outline" 
-                          style={{ padding: '0.5rem 1.5rem', fontSize: '0.9rem', fontWeight: 'bold', backgroundColor: '#fff', textTransform: 'uppercase', letterSpacing: '0.05em' }}
-                          onClick={() => markNoBehavior(behavior)}
-                        >
-                          No Behavior
-                        </button>
+                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                          <button 
+                            className="btn-orange-outline" 
+                            style={{ padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 'bold', backgroundColor: '#fff', textTransform: 'uppercase' }}
+                            onClick={() => markNoBehavior(behavior)}
+                          >
+                            No Behavior
+                          </button>
+                          <button 
+                            style={{ padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 'bold', backgroundColor: '#fee2e2', color: '#ef4444', border: '1px solid #fca5a5', borderRadius: '8px', cursor: 'pointer', textTransform: 'uppercase' }}
+                            onClick={() => markNoData(behavior)}
+                          >
+                            No Data
+                          </button>
+                        </div>
                       </td>
                     </tr>
                     {subRows.map(sub => (
