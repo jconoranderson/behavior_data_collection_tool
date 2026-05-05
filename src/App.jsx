@@ -157,37 +157,6 @@ function App() {
     }
   }, [activeClientId, activeDate, activeShift, historyData]);
 
-  const saveCurrentEntry = () => {
-    if (!activeClientId) return;
-    
-    const isEmpty = Object.keys(currentEntryData).length === 0 || 
-                    Object.values(currentEntryData).every(v => v === '' || v === 0);
-    
-    const newHistory = [...historyData];
-    const index = newHistory.findIndex(
-      r => r.clientId === activeClientId && r.date === activeDate && r.shift === activeShift
-    );
-
-    if (isEmpty) {
-      if (index !== -1) newHistory.splice(index, 1);
-    } else {
-      const record = {
-        id: `${activeClientId}_${activeDate}_${activeShift}`,
-        clientId: activeClientId,
-        date: activeDate,
-        shift: activeShift,
-        data: currentEntryData
-      };
-      if (index !== -1) {
-        newHistory[index] = record;
-      } else {
-        newHistory.push(record);
-      }
-    }
-    
-    setHistoryData(newHistory);
-    alert('Entry saved successfully!');
-  };
 
   // Sync Functions
   const syncToCloud = async () => {
@@ -374,10 +343,41 @@ function App() {
   const activeManeuvers = new Set(activeClientObj?.maneuvers || []);
 
   const handleCellChange = (key, value) => {
-    setCurrentEntryData(prev => ({
-      ...prev,
-      [key]: value
-    }));
+    setCurrentEntryData(prev => {
+      const nextData = { ...prev, [key]: value };
+      
+      if (activeClientId && activeDate && activeShift) {
+        setHistoryData(prevHistory => {
+          const newHistory = [...prevHistory];
+          const index = newHistory.findIndex(
+            r => r.clientId === activeClientId && r.date === activeDate && r.shift === activeShift
+          );
+          
+          const isEmpty = Object.keys(nextData).length === 0 || 
+                          Object.values(nextData).every(v => v === '' || v === 0);
+          
+          if (isEmpty) {
+            if (index !== -1) newHistory.splice(index, 1);
+          } else {
+            const record = {
+              id: `${activeClientId}_${activeDate}_${activeShift}`,
+              clientId: activeClientId,
+              date: activeDate,
+              shift: activeShift,
+              data: nextData
+            };
+            if (index !== -1) {
+              newHistory[index] = record;
+            } else {
+              newHistory.push(record);
+            }
+          }
+          return newHistory;
+        });
+      }
+      
+      return nextData;
+    });
   };
 
   const getIntensitySum = (behavior, dataObj) => {
@@ -624,9 +624,6 @@ function App() {
           </div>
 
           <div className="tracker-controls">
-            <button className="btn-orange" onClick={saveCurrentEntry} style={{ padding: '0.75rem 1.5rem', fontWeight: '600' }}>
-              <Save size={18} /> Save Entry
-            </button>
             <button onClick={() => setCurrentView('review')} className="btn-orange-outline">
               <Calendar size={20} /> Review Data
             </button>
