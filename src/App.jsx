@@ -749,20 +749,20 @@ function App() {
                 return (
                   <React.Fragment key={behavior}>
                     <tr style={{ backgroundColor: bgColor }}>
-                      <td style={{ fontWeight: 'bold', paddingLeft: '10px' }}>{behavior}</td>
-                      <td style={{ textAlign: 'center', padding: '0.25rem 0.5rem' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ color: '#ef4444', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                            {warningText}
-                          </span>
-                          <button 
-                            className="btn-orange-outline" 
-                            style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', backgroundColor: 'rgba(255,255,255,0.7)', border: '1px solid #cbd5e1' }}
-                            onClick={() => markNoBehavior(behavior)}
-                          >
-                            No Behavior
-                          </button>
+                      <td style={{ fontWeight: 'bold', paddingLeft: '10px', verticalAlign: 'middle' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                          <span>{behavior}</span>
+                          {warningText && <span style={{ color: '#ef4444', fontSize: '0.75rem' }}>{warningText}</span>}
                         </div>
+                      </td>
+                      <td style={{ textAlign: 'center', padding: '0.5rem' }}>
+                        <button 
+                          className="btn-orange-outline" 
+                          style={{ padding: '0.5rem 1.5rem', fontSize: '0.9rem', fontWeight: 'bold', backgroundColor: '#fff', textTransform: 'uppercase', letterSpacing: '0.05em' }}
+                          onClick={() => markNoBehavior(behavior)}
+                        >
+                          No Behavior
+                        </button>
                       </td>
                     </tr>
                     {subRows.map(sub => (
