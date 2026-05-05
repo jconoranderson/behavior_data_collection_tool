@@ -391,26 +391,70 @@ function App() {
     if (!activeClientObj) return;
 
     const clientRecords = historyData.filter(r => r.clientId === activeClientObj.id);
-    clientRecords.sort((a, b) => {
-      if (a.date !== b.date) return a.date.localeCompare(b.date);
-      return SHIFTS.indexOf(a.shift) - SHIFTS.indexOf(b.shift);
-    });
-
+    
     if (clientRecords.length === 0) {
       alert("No data available to export for this client.");
       return;
     }
 
+    // Determine setup date (fallback to earliest record)
+    let setupDateStr = activeClientObj.setupDate;
+    if (!setupDateStr) {
+      setupDateStr = clientRecords.map(r => r.date).sort()[0];
+    }
+    
+    const todayStr = getLocalISODate(new Date());
+    const now = new Date();
+    const currentHour = now.getHours();
+    
+    const isPastOrCurrentShift = (dateStr, shift) => {
+      if (dateStr < todayStr) return true;
+      if (dateStr > todayStr) return false;
+      // it is today
+      if (shift === "7am-3pm (Education)") return currentHour >= 7;
+      if (shift === "3pm-11pm") return currentHour >= 15;
+      if (shift === "11pm-7am") return currentHour >= 23;
+      return true;
+    };
+
+    const requiredShifts = [];
+    const [sY, sM, sD] = setupDateStr.split('-').map(Number);
+    const [eY, eM, eD] = todayStr.split('-').map(Number);
+    let currentD = new Date(sY, sM - 1, sD);
+    const endD = new Date(eY, eM - 1, eD);
+    
+    while (currentD <= endD) {
+      const dStr = getLocalISODate(currentD);
+      SHIFTS.forEach(shift => {
+        if (isPastOrCurrentShift(dStr, shift)) {
+          requiredShifts.push({ date: dStr, shift });
+        }
+      });
+      currentD.setDate(currentD.getDate() + 1);
+    }
+
     const allErrors = [];
-    clientRecords.forEach(r => {
-      const errs = validateRecord(r, activeClientObj);
-      allErrors.push(...errs);
+    
+    requiredShifts.forEach(req => {
+      const record = clientRecords.find(r => r.date === req.date && r.shift === req.shift);
+      if (!record) {
+        allErrors.push(`Missing completely: ${req.date} (${req.shift}). Please complete it or click 'No Behavior'.`);
+      } else {
+        const errs = validateRecord(record, activeClientObj);
+        allErrors.push(...errs);
+      }
     });
 
     if (allErrors.length > 0) {
-      setExportModal({ errors: allErrors });
+      const displayErrors = allErrors.length > 20 ? [...allErrors.slice(0, 20), `...and ${allErrors.length - 20} more errors.`] : allErrors;
+      setExportModal({ errors: displayErrors });
       return;
     }
+
+    clientRecords.sort((a, b) => {
+      if (a.date !== b.date) return a.date.localeCompare(b.date);
+      return SHIFTS.indexOf(a.shift) - SHIFTS.indexOf(b.shift);
+    });
 
     const columns = clientRecords.map(r => `${r.date}\n${r.shift}`);
 
@@ -647,12 +691,8 @@ function App() {
 
                 const hasBoth = dims.includes("Intensity") && dims.includes("Duration");
                 
-                const hasData = subRows.some(sub => currentEntryData[`${behavior}_${sub}`] !== undefined && currentEntryData[`${behavior}_${sub}`] !== '');
-                
                 let warningText = '';
-                if (!hasData) {
-                  warningText = '⚠ Missing Data';
-                } else if (hasBoth) {
+                if (hasBoth) {
                   const iSum = getIntensitySum(behavior, currentEntryData);
                   const dSum = getDurationSum(behavior, currentEntryData);
                   if (iSum !== dSum && (iSum > 0 || dSum > 0)) {
