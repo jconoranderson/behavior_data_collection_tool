@@ -115,10 +115,7 @@ function App() {
   // Review Page State
   const [reviewMonth, setReviewMonth] = useState(() => loadState('reviewMonth', new Date()));
 
-  // Cloud Sync State
-  const [githubToken, setGithubToken] = useState(() => loadState('githubToken', ''));
-  const [gistId, setGistId] = useState(() => loadState('gistId', ''));
-  const [syncStatus, setSyncStatus] = useState('');
+
 
   const [exportModal, setExportModal] = useState(null);
 
@@ -135,12 +132,11 @@ function App() {
     localStorage.setItem('behaviorTracker_historyData', JSON.stringify(historyData));
     localStorage.setItem('behaviorTracker_activeClientId', JSON.stringify(activeClientId));
     localStorage.setItem('behaviorTracker_reviewMonth', JSON.stringify(reviewMonth.toISOString()));
-    localStorage.setItem('behaviorTracker_githubToken', JSON.stringify(githubToken));
-    localStorage.setItem('behaviorTracker_gistId', JSON.stringify(gistId));
+
   }, [
     currentView, residenceName, clients, 
     draftName, draftBehaviors, draftDimensions, draftManeuvers, 
-    historyData, activeClientId, reviewMonth, githubToken, gistId
+    historyData, activeClientId, reviewMonth
   ]);
 
   // Load entry data when client, date, or shift changes
@@ -158,89 +154,7 @@ function App() {
   }, [activeClientId, activeDate, activeShift, historyData]);
 
 
-  // Sync Functions
-  const syncToCloud = async () => {
-    if (!githubToken || !gistId) {
-      alert("Please provide GitHub Token and Gist ID for syncing.");
-      return;
-    }
-    setSyncStatus('Saving...');
-    try {
-      const payload = {
-        residenceName,
-        clients,
-        historyData
-      };
-      
-      const res = await fetch(`https://api.github.com/gists/${gistId}`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `token ${githubToken}`,
-          'Accept': 'application/vnd.github.v3+json'
-        },
-        body: JSON.stringify({
-          files: {
-            'behavior_data.json': {
-              content: JSON.stringify(payload, null, 2)
-            }
-          }
-        })
-      });
-      
-      if (!res.ok) throw new Error("Failed to save to Gist");
-      setSyncStatus('Saved successfully');
-      setTimeout(() => setSyncStatus(''), 3000);
-    } catch (err) {
-      console.error(err);
-      setSyncStatus('Error saving');
-    }
-  };
 
-  const loadFromCloud = async () => {
-    if (!githubToken || !gistId) {
-      alert("Please provide GitHub Token and Gist ID for syncing.");
-      return;
-    }
-    setSyncStatus('Loading...');
-    try {
-      const res = await fetch(`https://api.github.com/gists/${gistId}`, {
-        headers: {
-          'Authorization': `token ${githubToken}`,
-          'Accept': 'application/vnd.github.v3+json'
-        }
-      });
-      if (!res.ok) throw new Error("Failed to load from Gist");
-      const data = await res.json();
-      const content = data.files['behavior_data.json']?.content;
-      if (content) {
-        const parsed = JSON.parse(content);
-        if (parsed.residenceName !== undefined) setResidenceName(parsed.residenceName);
-        
-        // Handle migration from old flat structure to per-resident structure
-        if (parsed.clients && parsed.clients.length > 0 && typeof parsed.clients[0] === 'string') {
-          const migratedClients = parsed.clients.map(name => ({
-            id: name,
-            name: name,
-            behaviors: parsed.targetBehaviors || [],
-            dimensions: parsed.behaviorDimensions || {},
-            maneuvers: parsed.selectedManeuvers || []
-          }));
-          setClients(migratedClients);
-        } else if (parsed.clients) {
-          setClients(parsed.clients);
-        }
-        
-        if (parsed.historyData) setHistoryData(parsed.historyData);
-        setSyncStatus('Loaded successfully');
-        setTimeout(() => setSyncStatus(''), 3000);
-      } else {
-        throw new Error("File not found in Gist");
-      }
-    } catch (err) {
-      console.error(err);
-      setSyncStatus('Error loading');
-    }
-  };
 
   const saveDraftResident = () => {
     if (!draftName.trim()) {
@@ -856,38 +770,7 @@ function App() {
         <div className="content-wrapper">
           <div className="white-card">
             
-            {/* Sync Status Bar */}
-            <div className="sync-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', backgroundColor: '#f8f9fa', borderRadius: '8px', marginBottom: '2rem' }}>
-              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                <Cloud size={24} color="#f97316" />
-                <span style={{ fontWeight: 'bold' }}>Cloud Sync</span>
-                {syncStatus && <span style={{ color: '#666', fontStyle: 'italic' }}>{syncStatus}</span>}
-              </div>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <input 
-                  type="password" 
-                  placeholder="GitHub Token" 
-                  className="form-control" 
-                  value={githubToken} 
-                  onChange={e => setGithubToken(e.target.value)} 
-                  style={{ width: '150px' }}
-                />
-                <input 
-                  type="text" 
-                  placeholder="Gist ID" 
-                  className="form-control" 
-                  value={gistId} 
-                  onChange={e => setGistId(e.target.value)} 
-                  style={{ width: '150px' }}
-                />
-                <button className="btn-orange-outline" onClick={loadFromCloud} title="Load Data">
-                  <CloudDownload size={18} /> Load
-                </button>
-                <button className="btn-orange" onClick={syncToCloud} title="Save Data">
-                  <CloudUpload size={18} /> Save
-                </button>
-              </div>
-            </div>
+
 
             <div className="section" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '2rem', marginBottom: '2rem' }}>
               <div className="form-group" style={{ marginBottom: 0 }}>
@@ -1015,9 +898,7 @@ function App() {
               <button className="btn-orange-outline large" onClick={saveDraftResident}>
                 <UserPlus size={24} /> Add Resident
               </button>
-              <button className="btn-orange-outline large" onClick={() => setCurrentView('review')}>
-                <Calendar size={24} /> Review Data
-              </button>
+
               <button className="btn-orange large" onClick={openTracker}>
                 <CheckCircle size={24} /> Complete Configuration
               </button>
