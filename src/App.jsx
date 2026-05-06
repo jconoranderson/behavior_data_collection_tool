@@ -633,11 +633,16 @@ function App() {
             className="btn-orange" 
             style={{ width: '100%', justifyContent: 'center', marginBottom: '1rem' }}
             onClick={async () => {
-              await auth.currentUser.reload();
-              if (auth.currentUser.emailVerified) {
-                setUser({...auth.currentUser});
-              } else {
-                setAuthError("Email not verified yet. Please check your spam folder.");
+              setAuthError("Checking status...");
+              try {
+                await auth.currentUser.reload();
+                if (auth.currentUser.emailVerified) {
+                  window.location.reload();
+                } else {
+                  setAuthError("Email not verified yet. Please check your inbox and spam folder.");
+                }
+              } catch (e) {
+                setAuthError("Error checking status: " + e.message);
               }
             }}
           >
