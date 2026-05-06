@@ -678,14 +678,14 @@ function App() {
           
           {/* Bottom Row: Pickers & Info */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', backgroundColor: '#f8f9fa', padding: '1rem 1.5rem', borderRadius: '8px', border: '1px solid #cbd5e1', alignItems: 'flex-start' }}>
-            <div className="form-group" style={{ marginBottom: 0, minWidth: '150px' }}>
+            <div className="form-group" style={{ marginBottom: 0, flex: '0 0 auto', marginRight: '1rem' }}>
               <label className="form-label" style={{ fontSize: '0.8rem', color: '#64748b' }}>Residence</label>
               <div style={{ padding: '0.5rem 0', fontWeight: 'bold', color: '#0f172a', fontSize: '1.1rem' }}>
                 {residenceName || 'Not Set'}
               </div>
             </div>
             
-            <div className="form-group" style={{ marginBottom: 0, flex: 1, minWidth: '200px' }}>
+            <div className="form-group" style={{ marginBottom: 0, flex: '1 1 200px', minWidth: 0 }}>
               <label className="form-label" style={{ fontSize: '0.8rem', color: '#64748b' }}>Client</label>
               <select 
                 className="form-control" 
@@ -696,7 +696,7 @@ function App() {
               </select>
             </div>
             
-            <div className="form-group" style={{ marginBottom: 0, flex: 1, minWidth: '160px' }}>
+            <div className="form-group" style={{ marginBottom: 0, flex: '1 1 150px', minWidth: 0 }}>
               <label className="form-label" style={{ fontSize: '0.8rem', color: '#64748b' }}>Date</label>
               <input 
                 type="date" 
@@ -706,7 +706,7 @@ function App() {
               />
             </div>
             
-            <div className="form-group" style={{ marginBottom: 0, flex: 2, minWidth: '220px' }}>
+            <div className="form-group" style={{ marginBottom: 0, flex: '2 1 250px', minWidth: 0 }}>
               <label className="form-label" style={{ fontSize: '0.8rem', color: '#64748b' }}>Shift</label>
               <select 
                 className="form-control" 
