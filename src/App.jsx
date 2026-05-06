@@ -605,43 +605,59 @@ function App() {
             row[0] = `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`;
             row[1] = rec.shift;
             
-            // Check if ANY interaction happened (data entered or "No Behavior" selected)
-            const hasExplicitData = Object.values(rec.data).some(v => v !== 'NO DATA' && v !== '' && v !== undefined);
-            
-            // Check if "No Behavior" was explicitly selected for all active behaviors
             const behaviors = client.behaviors || [];
-            const isExplicitlyNoBehavior = behaviors.length > 0 && behaviors.every(beh => {
+            let totalSubCount = 0;
+            let zeroCount = 0;
+            let nullCount = 0;
+            let positiveCount = 0;
+            
+            behaviors.forEach(beh => {
               const dims = (client.dimensions || {})[beh] || [];
               const subs = dims.flatMap(d => AVAILABLE_DIMENSIONS[d] || []);
-              return subs.every(sub => rec.data[`${beh}_${sub}`] === 'NO BEHAVIOR');
+              subs.forEach(sub => {
+                totalSubCount++;
+                const val = rec.data[`${beh}_${sub}`];
+                if (val === 'NO DATA' || val === '' || val === undefined) {
+                  nullCount++;
+                } else if (val === 0 || val === '0') {
+                  zeroCount++;
+                } else {
+                  positiveCount++;
+                }
+              });
             });
 
-            if (isExplicitlyNoBehavior) {
-              row[2] = 'No Behaviors';
-            } else if (!hasExplicitData) {
-              row[2] = 'No Data Recorded';
+            // Determine states for Column C and Frequency (Column E)
+            let colC = '';
+            let freqVal = '';
+            
+            if (totalSubCount > 0 && nullCount === totalSubCount) {
+              // 100% missing data
+              colC = 'No Data Recorded';
+              freqVal = '';
+            } else if (totalSubCount > 0 && positiveCount === 0 && zeroCount > 0) {
+              // At least some zeros explicitly recorded, and NO positive events
+              colC = 'No Behaviors';
+              freqVal = 0;
             } else {
-              row[2] = '';
-            }
-
-            // Calculate overall Frequency (Column E / index 4)
-            if (!hasExplicitData) {
-              row[4] = ''; // Null data point
-            } else {
+              // There is positive data (or no behaviors configured)
+              colC = '';
               let shiftFrequency = 0;
-              (client.behaviors || []).forEach(beh => {
-                let behMax = 0;
+              behaviors.forEach(beh => {
                 const iSum = getIntensitySum(beh, rec.data);
                 const dSum = getDurationSum(beh, rec.data);
                 const fVal = parseInt(rec.data[`${beh}_Frequency`], 10) || 0;
                 const aVal = parseInt(rec.data[`${beh}_Attempts`], 10) || 0;
                 const sVal = parseInt(rec.data[`${beh}_Successes`], 10) || 0;
                 
-                behMax = Math.max(iSum, dSum, fVal);
+                const behMax = Math.max(iSum, dSum, fVal);
                 shiftFrequency += (behMax + aVal + sVal);
               });
-              row[4] = shiftFrequency; // 0 if explicitly No Behavior, or a sum if behaviors occurred
+              freqVal = shiftFrequency;
             }
+
+            row[2] = colC;
+            row[4] = freqVal;
 
             // Fill behavior cells and comments
             colDefs.forEach((col, i) => {
