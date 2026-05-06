@@ -73,7 +73,7 @@ const RockerInput = ({ value, onChange }) => {
 };
 
 function App() {
-  const [currentView, setCurrentView] = useState('setup');
+  const [currentView, setCurrentView] = useState(null);
   const [residenceName, setResidenceName] = useState('');
   
   // clients is now an array of objects: { id, name, behaviors, dimensions, maneuvers }
@@ -130,6 +130,18 @@ function App() {
         if (data.clients) setClients(data.clients);
         if (data.residenceName !== undefined) setResidenceName(data.residenceName);
         if (data.historyData) setHistoryData(data.historyData);
+
+        if (!firebaseDataLoaded) {
+          if (data.clients && data.clients.length > 0) {
+            setCurrentView('tracker');
+            // Ensure an active client is set
+            setActiveClientId(prev => prev || data.clients[0].id);
+          } else {
+            setCurrentView('setup');
+          }
+        }
+      } else {
+        if (!firebaseDataLoaded) setCurrentView('setup');
       }
       setFirebaseDataLoaded(true);
     });
@@ -632,6 +644,10 @@ function App() {
         </div>
       </div>
     );
+  }
+
+  if (!firebaseDataLoaded || !currentView) {
+    return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#f1f5f9', color: '#64748b', fontSize: '1.2rem', fontFamily: 'Inter, sans-serif' }}>Loading clinical data...</div>;
   }
 
   if (currentView === 'review') {
