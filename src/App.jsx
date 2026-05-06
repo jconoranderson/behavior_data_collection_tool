@@ -605,47 +605,43 @@ function App() {
             row[0] = `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`;
             row[1] = rec.shift;
             
-            // Check if ANY data exists for this shift
-            const hasAnyData = Object.values(rec.data).some(v => v !== 'NO DATA' && v !== '' && v !== undefined);
-            row[2] = hasAnyData ? '' : 'No Data Recorded';
+            // Check if ANY interaction happened (data entered or "No Behavior" selected)
+            const hasExplicitData = Object.values(rec.data).some(v => v !== 'NO DATA' && v !== '' && v !== undefined);
+            
+            // Check if "No Behavior" was explicitly selected for all active behaviors
+            const behaviors = client.behaviors || [];
+            const isExplicitlyNoBehavior = behaviors.length > 0 && behaviors.every(beh => {
+              const dims = (client.dimensions || {})[beh] || [];
+              const subs = dims.flatMap(d => AVAILABLE_DIMENSIONS[d] || []);
+              return subs.every(sub => rec.data[`${beh}_${sub}`] === 'NO BEHAVIOR');
+            });
+
+            if (isExplicitlyNoBehavior) {
+              row[2] = 'No Behaviors';
+            } else if (!hasExplicitData) {
+              row[2] = 'No Data Recorded';
+            } else {
+              row[2] = '';
+            }
 
             // Calculate overall Frequency (Column E / index 4)
-            let totalFreq = 0;
-            
-            colDefs.forEach((col, i) => {
-              if (i < 5) return;
-              if (col.type === 'behavior') {
-                const val = rec.data[`${col.behavior}_${col.sub}`];
-                if (val !== 'NO BEHAVIOR' && val !== 'NO DATA' && val !== '' && val !== undefined) {
-                  const p = parseInt(val, 10);
-                  if (!isNaN(p)) {
-                    row[i] = p;
-                    // Only add to total freq if it's one of the "counting" dimensions
-                    // Usually we sum Intensity OR Duration (since they should match) plus attempts/successes
-                    // To be safe and avoid double counting I/D, we'll sum all numeric entries but divide by 2 for I/D pairs
-                    // Or just count "Events" based on the highest count in any dimension for that behavior
-                  }
-                }
-              }
-            });
-
-            // Improved Frequency Logic: Sum of counts per behavior
-            let shiftFrequency = 0;
-            (client.behaviors || []).forEach(beh => {
-              const dims = (client.dimensions || {})[beh] || [];
-              let behMax = 0;
-              // Intensity / Duration / Frequency / Attempts / Successes
-              // We'll take the max of (Intensity Sum, Duration Sum, Frequency) then add Attempts and Successes
-              const iSum = getIntensitySum(beh, rec.data);
-              const dSum = getDurationSum(beh, rec.data);
-              const fVal = parseInt(rec.data[`${beh}_Frequency`], 10) || 0;
-              const aVal = parseInt(rec.data[`${beh}_Attempts`], 10) || 0;
-              const sVal = parseInt(rec.data[`${beh}_Successes`], 10) || 0;
-              
-              behMax = Math.max(iSum, dSum, fVal);
-              shiftFrequency += (behMax + aVal + sVal);
-            });
-            row[4] = shiftFrequency > 0 ? shiftFrequency : 0;
+            if (!hasExplicitData) {
+              row[4] = ''; // Null data point
+            } else {
+              let shiftFrequency = 0;
+              (client.behaviors || []).forEach(beh => {
+                let behMax = 0;
+                const iSum = getIntensitySum(beh, rec.data);
+                const dSum = getDurationSum(beh, rec.data);
+                const fVal = parseInt(rec.data[`${beh}_Frequency`], 10) || 0;
+                const aVal = parseInt(rec.data[`${beh}_Attempts`], 10) || 0;
+                const sVal = parseInt(rec.data[`${beh}_Successes`], 10) || 0;
+                
+                behMax = Math.max(iSum, dSum, fVal);
+                shiftFrequency += (behMax + aVal + sVal);
+              });
+              row[4] = shiftFrequency; // 0 if explicitly No Behavior, or a sum if behaviors occurred
+            }
 
             // Fill behavior cells and comments
             colDefs.forEach((col, i) => {
@@ -657,7 +653,6 @@ function App() {
                 else { const p = parseInt(val, 10); row[i] = isNaN(p) ? '' : p; }
               }
               if (col.type === 'comment') {
-                // If it's a general behavior group comment or the main comment
                 row[i] = rec.data[`${col.behavior}_Comments`] || rec.data['Comments'] || '';
               }
               if (col.type === 'scip') {
