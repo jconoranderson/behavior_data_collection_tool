@@ -105,6 +105,8 @@ function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [registerName, setRegisterName] = useState('');
+  const [registerDepartment, setRegisterDepartment] = useState('');
   const [authError, setAuthError] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
   const [firebaseDataLoaded, setFirebaseDataLoaded] = useState(false);
@@ -118,7 +120,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!user || !user.emailVerified) {
+    if (!user) {
       setFirebaseDataLoaded(false);
       return;
     }
@@ -149,7 +151,7 @@ function App() {
   }, [user]);
 
   useEffect(() => {
-    if (!user || !user.emailVerified || !firebaseDataLoaded) return;
+    if (!user || !firebaseDataLoaded) return;
     const docRef = doc(db, 'organization', 'main');
     setDoc(docRef, { clients, residenceName, historyData }, { merge: true });
   }, [clients, residenceName, historyData, user, firebaseDataLoaded]);
@@ -570,8 +572,25 @@ function App() {
 
     try {
       if (isRegistering) {
+        if (!registerName.trim() || !registerDepartment.trim()) {
+          setAuthError("Please provide your full name and department.");
+          return;
+        }
         const userCredential = await createUserWithEmailAndPassword(auth, loginEmail, loginPassword);
-        await sendEmailVerification(userCredential.user);
+        
+        // Update user profile
+        await updateProfile(userCredential.user, {
+          displayName: registerName.trim()
+        });
+        
+        // Store user details in Firestore
+        await setDoc(doc(db, 'users', userCredential.user.uid), {
+          name: registerName.trim(),
+          department: registerDepartment.trim(),
+          email: loginEmail,
+          createdAt: new Date().toISOString()
+        });
+        
       } else {
         await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
       }
@@ -595,6 +614,18 @@ function App() {
           </div>
           
           <form onSubmit={handleAuth}>
+            {isRegistering && (
+              <>
+                <div className="form-group">
+                  <label className="form-label">Full Name</label>
+                  <input type="text" required className="form-control" placeholder="e.g. Jane Doe" value={registerName} onChange={e => setRegisterName(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Department / Role</label>
+                  <input type="text" required className="form-control" placeholder="e.g. Clinical Staff" value={registerDepartment} onChange={e => setRegisterDepartment(e.target.value)} />
+                </div>
+              </>
+            )}
             <div className="form-group">
               <label className="form-label">Email Address</label>
               <input type="email" required className="form-control" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} />
@@ -620,46 +651,7 @@ function App() {
     );
   }
 
-  if (user && !user.emailVerified) {
-    return (
-      <div className="layout" style={{ justifyContent: 'center', alignItems: 'center', backgroundColor: '#f1f5f9' }}>
-        <div className="white-card" style={{ maxWidth: '400px', width: '100%', padding: '3rem 2rem', textAlign: 'center' }}>
-          <AlertTriangle size={48} color="#f59e0b" style={{ margin: '0 auto 1rem auto', display: 'block' }} />
-          <h2 style={{ color: '#0f172a', marginBottom: '1rem' }}>Verify Your Email</h2>
-          <p style={{ color: '#64748b', marginBottom: '1.5rem', lineHeight: '1.5' }}>
-            We sent a verification link to <strong>{user.email}</strong>. Please check your inbox and click the link to activate your account.
-          </p>
-          <button 
-            className="btn-orange" 
-            style={{ width: '100%', justifyContent: 'center', marginBottom: '1rem' }}
-            onClick={async () => {
-              setAuthError("Checking status...");
-              try {
-                await auth.currentUser.reload();
-                if (auth.currentUser.emailVerified) {
-                  window.location.reload();
-                } else {
-                  setAuthError("Email not verified yet. Please check your inbox and spam folder.");
-                }
-              } catch (e) {
-                setAuthError("Error checking status: " + e.message);
-              }
-            }}
-          >
-            I've Verified My Email
-          </button>
-          <button 
-            className="btn-orange-outline" 
-            style={{ width: '100%', justifyContent: 'center' }}
-            onClick={() => signOut(auth)}
-          >
-            Sign Out
-          </button>
-          {authError && <div style={{ color: '#ef4444', marginTop: '1rem', fontSize: '0.85rem' }}>{authError}</div>}
-        </div>
-      </div>
-    );
-  }
+
 
   if (!firebaseDataLoaded || !currentView) {
     return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#f1f5f9', color: '#64748b', fontSize: '1.2rem', fontFamily: 'Inter, sans-serif' }}>Loading clinical data...</div>;
