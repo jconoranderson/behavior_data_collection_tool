@@ -1048,7 +1048,7 @@ function App() {
                         e.preventDefault();
                         if (draftResidence.trim() && !residences.includes(draftResidence.trim())) {
                           setResidences([...residences, draftResidence.trim()]);
-                          if (!activeResidence) setActiveResidence(draftResidence.trim());
+                          setActiveResidence(draftResidence.trim());
                           setDraftResidence('');
                         }
                       }
@@ -1060,7 +1060,7 @@ function App() {
                   onClick={() => {
                     if (draftResidence.trim() && !residences.includes(draftResidence.trim())) {
                       setResidences([...residences, draftResidence.trim()]);
-                      if (!activeResidence) setActiveResidence(draftResidence.trim());
+                      setActiveResidence(draftResidence.trim());
                       setDraftResidence('');
                     }
                   }}
