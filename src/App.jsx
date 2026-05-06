@@ -131,18 +131,26 @@ function App() {
       if (snap.metadata.hasPendingWrites) return; // ignore local updates echoing back
       if (snap.exists()) {
         const data = snap.data();
-        if (data.clients) setClients(data.clients);
-        if (data.residences) setResidences(data.residences);
-        if (!data.residences && data.residenceName) setResidences([data.residenceName]);
+        const loadedResidences = data.residences || (data.residenceName ? [data.residenceName] : []);
+        if (loadedResidences.length) setResidences(loadedResidences);
+
+        if (data.clients) {
+          // Migrate any legacy clients that don't have a residence field
+          const firstResidence = loadedResidences[0] || '';
+          const migratedClients = data.clients.map(c =>
+            c.residence ? c : { ...c, residence: firstResidence }
+          );
+          setClients(migratedClients);
+        }
+
         if (data.historyData) setHistoryData(data.historyData);
 
         if (!firebaseDataLoaded) {
           if (data.clients && data.clients.length > 0) {
             setCurrentView('tracker');
-            // Ensure an active client is set
+            const firstRes = (data.residences && data.residences[0]) || data.residenceName || '';
+            setActiveResidence(prev => prev || firstRes);
             setActiveClientId(prev => prev || data.clients[0].id);
-            if (data.residences && data.residences.length > 0) setActiveResidence(prev => prev || data.residences[0]);
-            else if (data.residenceName) setActiveResidence(prev => prev || data.residenceName);
           } else {
             setCurrentView('setup');
           }
