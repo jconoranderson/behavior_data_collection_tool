@@ -134,14 +134,7 @@ function App() {
         const loadedResidences = data.residences || (data.residenceName ? [data.residenceName] : []);
         if (loadedResidences.length) setResidences(loadedResidences);
 
-        if (data.clients) {
-          // Migrate any legacy clients that don't have a residence field
-          const firstResidence = loadedResidences[0] || '';
-          const migratedClients = data.clients.map(c =>
-            c.residence ? c : { ...c, residence: firstResidence }
-          );
-          setClients(migratedClients);
-        }
+        if (data.clients) setClients(data.clients);
 
         if (data.historyData) setHistoryData(data.historyData);
 
@@ -295,8 +288,14 @@ function App() {
     setCurrentView('tracker');
   };
 
-  // Tracker Logic Helpers
-  const filteredClients = clients.filter(c => c.residence === activeResidence);
+  // filteredClients: strict match on residence, but legacy clients (no residence field)
+  // fall back to showing under the first residence so data is never lost.
+  const firstResidence = residences[0] || '';
+  const filteredClients = clients.filter(c =>
+    c.residence
+      ? c.residence === activeResidence
+      : activeResidence === firstResidence
+  );
   const activeClientObj = clients.find(c => c.id === activeClientId);
   const activeBehaviors = activeClientObj?.behaviors || [];
   const activeDimensions = activeClientObj?.dimensions || {};
