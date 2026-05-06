@@ -563,7 +563,7 @@ function App() {
             <h2>REVIEW DATA</h2>
           </div>
           
-          <div className="tracker-info" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <div className="tracker-info">
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label" style={{ fontSize: '0.8rem' }}>Client</label>
               <select 
@@ -662,7 +662,15 @@ function App() {
             <h2>BEHAVIOR DATA SHEET</h2>
           </div>
           
-          <div className="tracker-info" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <div className="tracker-info">
+            {residenceName && (
+              <div className="form-group" style={{ marginBottom: 0, marginRight: '1rem' }}>
+                <label className="form-label" style={{ fontSize: '0.8rem' }}>Residence</label>
+                <div style={{ padding: '0.5rem 0', fontWeight: 'bold', color: '#1e293b', fontSize: '1.1rem' }}>
+                  {residenceName}
+                </div>
+              </div>
+            )}
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label" style={{ fontSize: '0.8rem' }}>Client</label>
               <select 
