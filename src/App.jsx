@@ -74,7 +74,9 @@ const RockerInput = ({ value, onChange }) => {
 
 function App() {
   const [currentView, setCurrentView] = useState(null);
-  const [residenceName, setResidenceName] = useState('');
+  const [residences, setResidences] = useState([]);
+  const [activeResidence, setActiveResidence] = useState('');
+  const [draftResidence, setDraftResidence] = useState('');
   
   // clients is now an array of objects: { id, name, behaviors, dimensions, maneuvers }
   const [clients, setClients] = useState([]);
@@ -130,7 +132,8 @@ function App() {
       if (snap.exists()) {
         const data = snap.data();
         if (data.clients) setClients(data.clients);
-        if (data.residenceName !== undefined) setResidenceName(data.residenceName);
+        if (data.residences) setResidences(data.residences);
+        if (!data.residences && data.residenceName) setResidences([data.residenceName]);
         if (data.historyData) setHistoryData(data.historyData);
 
         if (!firebaseDataLoaded) {
@@ -138,6 +141,8 @@ function App() {
             setCurrentView('tracker');
             // Ensure an active client is set
             setActiveClientId(prev => prev || data.clients[0].id);
+            if (data.residences && data.residences.length > 0) setActiveResidence(prev => prev || data.residences[0]);
+            else if (data.residenceName) setActiveResidence(prev => prev || data.residenceName);
           } else {
             setCurrentView('setup');
           }
@@ -153,8 +158,8 @@ function App() {
   useEffect(() => {
     if (!user || !firebaseDataLoaded) return;
     const docRef = doc(db, 'organization', 'main');
-    setDoc(docRef, { clients, residenceName, historyData }, { merge: true });
-  }, [clients, residenceName, historyData, user, firebaseDataLoaded]);
+    setDoc(docRef, { clients, residences, historyData }, { merge: true });
+  }, [clients, residences, historyData, user, firebaseDataLoaded]);
 
   // Load entry data when client, date, or shift changes
   useEffect(() => {
@@ -512,8 +517,8 @@ function App() {
 
     const rows = [];
     rows.push([`BEHAVIOR DATA SHEET — ${activeClientObj.name}`, ...Array(columns.length).fill('')]);
-    if (residenceName) {
-      rows.push([`Residence: ${residenceName}`, ...Array(columns.length).fill('')]);
+    if (activeResidence) {
+      rows.push([`Residence: ${activeResidence}`, ...Array(columns.length).fill('')]);
     }
     rows.push([]);
     rows.push(['Date & Shift', ...columns]);
@@ -799,9 +804,14 @@ function App() {
           <div className="tracker-filters">
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label" style={{ fontSize: '0.8rem', color: '#64748b' }}>Residence</label>
-              <div style={{ padding: '0.5rem 0', fontWeight: 'bold', color: '#0f172a', fontSize: '1.1rem', whiteSpace: 'nowrap' }}>
-                {residenceName || 'Not Set'}
-              </div>
+              <select 
+                className="form-control" 
+                value={activeResidence} 
+                onChange={e => setActiveResidence(e.target.value)}
+              >
+                {residences.length === 0 ? <option value="">Not Set</option> : null}
+                {residences.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
             </div>
             
             <div className="form-group" style={{ marginBottom: 0 }}>
@@ -987,16 +997,58 @@ function App() {
 
 
             <div className="section" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '2rem', marginBottom: '2rem' }}>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label" style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>Residence Name</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="e.g. Oak Street House"
-                  value={residenceName}
-                  onChange={e => setResidenceName(e.target.value)}
-                  style={{ maxWidth: '400px' }}
-                />
+              <h3 style={{ marginBottom: '1rem', color: '#0f172a' }}>Configured Residences</h3>
+              
+              {residences.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
+                  {residences.map(r => (
+                    <div key={r} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#f1f5f9', padding: '0.5rem 1rem', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
+                      <span style={{ fontWeight: '600' }}>{r}</span>
+                      <button onClick={() => {
+                        const newRes = residences.filter(x => x !== r);
+                        setResidences(newRes);
+                        if (activeResidence === r) setActiveResidence(newRes[0] || '');
+                      }} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0 0.25rem' }}>
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', maxWidth: '500px' }}>
+                <div className="form-group" style={{ marginBottom: 0, flex: 1 }}>
+                  <label className="form-label" style={{ fontSize: '0.9rem' }}>Add Residence</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="e.g. Oak Street House"
+                    value={draftResidence}
+                    onChange={e => setDraftResidence(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (draftResidence.trim() && !residences.includes(draftResidence.trim())) {
+                          setResidences([...residences, draftResidence.trim()]);
+                          if (!activeResidence) setActiveResidence(draftResidence.trim());
+                          setDraftResidence('');
+                        }
+                      }
+                    }}
+                  />
+                </div>
+                <button 
+                  className="btn-orange" 
+                  onClick={() => {
+                    if (draftResidence.trim() && !residences.includes(draftResidence.trim())) {
+                      setResidences([...residences, draftResidence.trim()]);
+                      if (!activeResidence) setActiveResidence(draftResidence.trim());
+                      setDraftResidence('');
+                    }
+                  }}
+                >
+                  <Plus size={20} /> Add
+                </button>
               </div>
             </div>
 
