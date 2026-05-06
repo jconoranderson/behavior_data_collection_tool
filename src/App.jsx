@@ -113,6 +113,29 @@ function App() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [firebaseDataLoaded, setFirebaseDataLoaded] = useState(false);
 
+  // Config password gate
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [configUser, setConfigUser] = useState('');
+  const [configPass, setConfigPass] = useState('');
+  const [configError, setConfigError] = useState('');
+
+  const openConfigWithPassword = () => {
+    setConfigUser('');
+    setConfigPass('');
+    setConfigError('');
+    setShowConfigModal(true);
+  };
+
+  const handleConfigAuth = (e) => {
+    e.preventDefault();
+    if (configUser === 'admin' && configPass === 'L@bsch00l') {
+      setShowConfigModal(false);
+      setCurrentView('setup');
+    } else {
+      setConfigError('Incorrect username or password.');
+    }
+  };
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
       setUser(u);
@@ -732,8 +755,8 @@ function App() {
             <button onClick={() => setCurrentView('tracker')} className="btn-orange">
               <Table size={20} /> Data Entry
             </button>
-            <button onClick={() => setCurrentView('setup')} className="btn-orange-outline">
-              <ArrowLeft size={20} /> Back to Setup
+            <button onClick={openConfigWithPassword} className="btn-orange-outline">
+              <ArrowLeft size={20} /> Edit Configuration
             </button>
           </div>
         </div>
@@ -815,8 +838,8 @@ function App() {
               <button className="btn-orange-outline" onClick={handleExport}>
                 <Download size={18} /> Export Full History
               </button>
-              <button onClick={() => setCurrentView('setup')} className="btn-orange-outline">
-                <ArrowLeft size={20} /> Back to Setup
+              <button onClick={openConfigWithPassword} className="btn-orange-outline">
+                <ArrowLeft size={20} /> Edit Configuration
               </button>
               <button onClick={() => signOut(auth)} className="btn-orange-outline" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#ef4444', borderColor: '#ef4444' }}>
                 <LogOut size={16} /> Sign Out
@@ -977,6 +1000,31 @@ function App() {
             </tbody>
           </table>
         </div>
+
+        {showConfigModal && (
+          <div className="modal-overlay" onClick={() => setShowConfigModal(false)}>
+            <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: '360px' }}>
+              <div className="modal-icon" style={{ color: 'var(--primary)' }}><Shield size={36} /></div>
+              <h3 className="modal-title">Configuration Access</h3>
+              <p className="modal-body" style={{ marginBottom: '1.5rem' }}>Enter admin credentials to edit the configuration.</p>
+              <form onSubmit={handleConfigAuth}>
+                <div className="form-group">
+                  <label className="form-label">Username</label>
+                  <input type="text" className="form-control" value={configUser} onChange={e => setConfigUser(e.target.value)} autoComplete="off" />
+                </div>
+                <div className="form-group" style={{ marginBottom: '1rem' }}>
+                  <label className="form-label">Password</label>
+                  <input type="password" className="form-control" value={configPass} onChange={e => setConfigPass(e.target.value)} />
+                </div>
+                {configError && <div style={{ color: '#ef4444', fontSize: '0.85rem', marginBottom: '1rem', textAlign: 'center' }}>{configError}</div>}
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <button type="submit" className="btn-orange" style={{ flex: 1, justifyContent: 'center' }}>Unlock</button>
+                  <button type="button" className="btn-orange-outline" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setShowConfigModal(false)}>Cancel</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         {exportModal && (
           <div className="modal-overlay" onClick={() => setExportModal(null)}>
