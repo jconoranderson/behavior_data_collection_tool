@@ -656,65 +656,66 @@ function App() {
   if (currentView === 'tracker') {
     return (
       <div className="tracker-view">
-        <div className="tracker-header">
-          <div className="tracker-brand">
-            <img src={tcfdLogo} alt="TCFD Logo" className="nav-logo" />
-            <h2>BEHAVIOR DATA SHEET</h2>
+        <div style={{ marginBottom: '2rem' }}>
+          {/* Top Row: Brand & Controls */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '2px solid var(--primary)' }}>
+            <div className="tracker-brand">
+              <img src={tcfdLogo} alt="TCFD Logo" className="nav-logo" />
+              <h2>BEHAVIOR DATA SHEET</h2>
+            </div>
+            <div className="tracker-controls">
+              <button onClick={() => setCurrentView('review')} className="btn-orange-outline">
+                <Calendar size={20} /> Review Data
+              </button>
+              <button className="btn-orange-outline" onClick={handleExport}>
+                <Download size={18} /> Export Full History
+              </button>
+              <button onClick={() => setCurrentView('setup')} className="btn-orange-outline">
+                <ArrowLeft size={20} /> Back to Setup
+              </button>
+            </div>
           </div>
           
-          <div className="tracker-info">
-            {residenceName && (
-              <div className="form-group" style={{ marginBottom: 0, marginRight: '1rem' }}>
-                <label className="form-label" style={{ fontSize: '0.8rem' }}>Residence</label>
-                <div style={{ padding: '0.5rem 0', fontWeight: 'bold', color: '#1e293b', fontSize: '1.1rem' }}>
-                  {residenceName}
-                </div>
+          {/* Bottom Row: Pickers & Info */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', backgroundColor: '#f8f9fa', padding: '1rem 1.5rem', borderRadius: '8px', border: '1px solid #cbd5e1', alignItems: 'flex-start' }}>
+            <div className="form-group" style={{ marginBottom: 0, minWidth: '150px' }}>
+              <label className="form-label" style={{ fontSize: '0.8rem', color: '#64748b' }}>Residence</label>
+              <div style={{ padding: '0.5rem 0', fontWeight: 'bold', color: '#0f172a', fontSize: '1.1rem' }}>
+                {residenceName || 'Not Set'}
               </div>
-            )}
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label" style={{ fontSize: '0.8rem' }}>Client</label>
+            </div>
+            
+            <div className="form-group" style={{ marginBottom: 0, flex: 1, minWidth: '200px' }}>
+              <label className="form-label" style={{ fontSize: '0.8rem', color: '#64748b' }}>Client</label>
               <select 
                 className="form-control" 
                 value={activeClientId} 
                 onChange={e => setActiveClientId(e.target.value)}
-                style={{ minWidth: '160px' }}
               >
                 {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label" style={{ fontSize: '0.8rem' }}>Date</label>
+            
+            <div className="form-group" style={{ marginBottom: 0, flex: 1, minWidth: '160px' }}>
+              <label className="form-label" style={{ fontSize: '0.8rem', color: '#64748b' }}>Date</label>
               <input 
                 type="date" 
                 className="form-control" 
                 value={activeDate}
                 onChange={e => setActiveDate(e.target.value)}
-                style={{ minWidth: '160px' }}
               />
             </div>
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label" style={{ fontSize: '0.8rem' }}>Shift</label>
+            
+            <div className="form-group" style={{ marginBottom: 0, flex: 2, minWidth: '220px' }}>
+              <label className="form-label" style={{ fontSize: '0.8rem', color: '#64748b' }}>Shift</label>
               <select 
                 className="form-control" 
                 value={activeShift}
                 onChange={e => setActiveShift(e.target.value)}
-                style={{ minWidth: '220px' }}
               >
                 {SHIFTS.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
-          </div>
-
-          <div className="tracker-controls">
-            <button onClick={() => setCurrentView('review')} className="btn-orange-outline">
-              <Calendar size={20} /> Review Data
-            </button>
-            <button className="btn-orange-outline" onClick={handleExport}>
-              <Download size={18} /> Export Full History
-            </button>
-            <button onClick={() => setCurrentView('setup')} className="btn-orange-outline">
-              <ArrowLeft size={20} /> Back to Setup
-            </button>
           </div>
         </div>
 
