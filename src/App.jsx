@@ -869,7 +869,7 @@ function App() {
 
             <div className="section" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '2rem', marginBottom: '2rem' }}>
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label" style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>Global Residence Name</label>
+                <label className="form-label" style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>Residence Name</label>
                 <input
                   type="text"
                   className="form-control"
