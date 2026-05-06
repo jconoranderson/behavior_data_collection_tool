@@ -175,10 +175,24 @@ function App() {
     }
   }, [activeClientId, activeDate, activeShift, historyData]);
 
+  // Handle active residence change
+  useEffect(() => {
+    if (activeResidence) {
+      const validClients = clients.filter(c => !c.residence || c.residence === activeResidence);
+      if (!validClients.some(c => c.id === activeClientId)) {
+        setActiveClientId(validClients[0]?.id || '');
+      }
+    }
+  }, [activeResidence, clients, activeClientId]);
+
 
 
 
   const saveDraftResident = () => {
+    if (!activeResidence) {
+      alert("Please add and select a Residence first.");
+      return;
+    }
     if (!draftName.trim()) {
       alert("Please enter a Resident Name before adding.");
       return;
@@ -190,8 +204,9 @@ function App() {
     }
 
     const newClient = {
-      id: draftName.trim(),
+      id: `${activeResidence}_${draftName.trim()}`,
       name: draftName.trim(),
+      residence: activeResidence,
       behaviors: draftBehaviors,
       dimensions: draftDimensions,
       maneuvers: Array.from(draftManeuvers)
@@ -273,6 +288,7 @@ function App() {
   };
 
   // Tracker Logic Helpers
+  const filteredClients = clients.filter(c => !c.residence || c.residence === activeResidence);
   const activeClientObj = clients.find(c => c.id === activeClientId);
   const activeBehaviors = activeClientObj?.behaviors || [];
   const activeDimensions = activeClientObj?.dimensions || {};
@@ -693,7 +709,8 @@ function App() {
                 onChange={e => setActiveClientId(e.target.value)}
                 style={{ minWidth: '160px' }}
               >
-                {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {filteredClients.length === 0 ? <option value="">No residents found</option> : null}
+                {filteredClients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
             
@@ -821,7 +838,8 @@ function App() {
                 value={activeClientId} 
                 onChange={e => setActiveClientId(e.target.value)}
               >
-                {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {filteredClients.length === 0 ? <option value="">No residents found</option> : null}
+                {filteredClients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
             
@@ -1052,22 +1070,37 @@ function App() {
               </div>
             </div>
 
-            {clients.length > 0 && (
-              <div className="section">
-                <h2 className="section-title"><User size={24} /> Configured Residents</h2>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  {clients.map(c => (
-                    <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#f1f5f9', padding: '0.75rem 1rem', borderRadius: '20px', border: '1px solid #cbd5e1' }}>
-                      <span style={{ fontWeight: '600' }}>{c.name}</span>
-                      <span style={{ fontSize: '0.8rem', color: '#64748b' }}>({c.behaviors.length} behaviors)</span>
-                      <button onClick={() => removeClient(c.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', marginLeft: '0.5rem' }}>
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
+            <div className="section" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '2rem', marginBottom: '2rem' }}>
+              <div className="form-group" style={{ maxWidth: '400px', marginBottom: '1.5rem' }}>
+                <label className="form-label" style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>Active Residence (Configuring For)</label>
+                <select 
+                  className="form-control" 
+                  value={activeResidence} 
+                  onChange={e => setActiveResidence(e.target.value)}
+                  style={{ border: '2px solid var(--primary)' }}
+                >
+                  {residences.length === 0 ? <option value="">Please add a residence above</option> : null}
+                  {residences.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
               </div>
-            )}
+
+              {filteredClients.length > 0 && (
+                <div>
+                  <h3 style={{ marginBottom: '1rem', color: '#0f172a' }}><User size={20} style={{ verticalAlign: 'middle', marginRight: '0.5rem' }}/> Configured Residents in {activeResidence || 'Location'}</h3>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    {filteredClients.map(c => (
+                      <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#f1f5f9', padding: '0.75rem 1rem', borderRadius: '20px', border: '1px solid #cbd5e1' }}>
+                        <span style={{ fontWeight: '600' }}>{c.name}</span>
+                        <span style={{ fontSize: '0.8rem', color: '#64748b' }}>({c.behaviors.length} behaviors)</span>
+                        <button onClick={() => removeClient(c.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', marginLeft: '0.5rem' }}>
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
 
             <div className="section" style={{ border: '2px dashed #cbd5e1', padding: '2rem', borderRadius: '12px', backgroundColor: '#fafafa' }}>
               <h2 className="section-title" style={{ marginBottom: '1.5rem', color: '#334155' }}><UserPlus size={24} /> Configure New Resident</h2>
