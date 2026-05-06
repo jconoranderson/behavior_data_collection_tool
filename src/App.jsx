@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Table, Plus, Minus, Trash2, Shield, Activity, User, ArrowLeft, Download, AlertTriangle, CheckCircle, Eraser, RotateCcw, Cloud, CloudUpload, CloudDownload, Save, UserPlus, Calendar } from 'lucide-react';
+import { Table, Plus, Minus, Trash2, Shield, Activity, User, ArrowLeft, Download, AlertTriangle, CheckCircle, Eraser, RotateCcw, Cloud, CloudUpload, CloudDownload, Save, UserPlus, Calendar, LogOut } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import tcfdLogo from './assets/tcfd.jpg';
+import { auth, db } from './firebase';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 
 const AVAILABLE_BEHAVIORS = [
   "Aggression", "Self-Injury", "Elopement", "Pica", "Disruptive Behaviors",
@@ -70,75 +73,74 @@ const RockerInput = ({ value, onChange }) => {
 };
 
 function App() {
-  const loadState = (key, defaultValue) => {
-    try {
-      const saved = localStorage.getItem(`behaviorTracker_${key}`);
-      if (saved !== null) {
-        if (key === 'draftManeuvers') {
-          return new Set(JSON.parse(saved));
-        }
-        if (key === 'reviewMonth') {
-          return new Date(JSON.parse(saved));
-        }
-        return JSON.parse(saved);
-      }
-    } catch (e) {
-      console.warn("Failed to load from local storage", e);
-    }
-    return defaultValue;
-  };
-
-  const [currentView, setCurrentView] = useState(() => loadState('currentView', 'setup'));
-  const [residenceName, setResidenceName] = useState(() => loadState('residenceName', ''));
+  const [currentView, setCurrentView] = useState('setup');
+  const [residenceName, setResidenceName] = useState('');
   
   // clients is now an array of objects: { id, name, behaviors, dimensions, maneuvers }
-  const [clients, setClients] = useState(() => loadState('clients', []));
+  const [clients, setClients] = useState([]);
 
   // Draft state for configuring a single resident
-  const [draftName, setDraftName] = useState(() => loadState('draftName', ''));
-  const [draftBehaviors, setDraftBehaviors] = useState(() => loadState('draftBehaviors', []));
-  const [draftDimensions, setDraftDimensions] = useState(() => loadState('draftDimensions', {}));
-  const [draftManeuvers, setDraftManeuvers] = useState(() => loadState('draftManeuvers', new Set()));
+  const [draftName, setDraftName] = useState('');
+  const [draftBehaviors, setDraftBehaviors] = useState([]);
+  const [draftDimensions, setDraftDimensions] = useState({});
+  const [draftManeuvers, setDraftManeuvers] = useState(new Set());
   const [selectedBehaviorInput, setSelectedBehaviorInput] = useState('');
 
   // Longitudinal data
-  const [historyData, setHistoryData] = useState(() => loadState('historyData', []));
+  const [historyData, setHistoryData] = useState([]);
 
   // Active entry state (Tracker)
-  const [activeClientId, setActiveClientId] = useState(() => loadState('activeClientId', ''));
-  const [activeDate, setActiveDate] = useState(() => {
-    const today = new Date();
-    return getLocalISODate(today);
-  });
+  const [activeClientId, setActiveClientId] = useState('');
+  const [activeDate, setActiveDate] = useState(() => getLocalISODate(new Date()));
   const [activeShift, setActiveShift] = useState(SHIFTS[0]);
   const [currentEntryData, setCurrentEntryData] = useState({});
 
   // Review Page State
-  const [reviewMonth, setReviewMonth] = useState(() => loadState('reviewMonth', new Date()));
-
-
+  const [reviewMonth, setReviewMonth] = useState(new Date());
 
   const [exportModal, setExportModal] = useState(null);
 
-  useEffect(() => {
-    localStorage.setItem('behaviorTracker_currentView', JSON.stringify(currentView));
-    localStorage.setItem('behaviorTracker_residenceName', JSON.stringify(residenceName));
-    localStorage.setItem('behaviorTracker_clients', JSON.stringify(clients));
-    
-    localStorage.setItem('behaviorTracker_draftName', JSON.stringify(draftName));
-    localStorage.setItem('behaviorTracker_draftBehaviors', JSON.stringify(draftBehaviors));
-    localStorage.setItem('behaviorTracker_draftDimensions', JSON.stringify(draftDimensions));
-    localStorage.setItem('behaviorTracker_draftManeuvers', JSON.stringify(Array.from(draftManeuvers)));
-    
-    localStorage.setItem('behaviorTracker_historyData', JSON.stringify(historyData));
-    localStorage.setItem('behaviorTracker_activeClientId', JSON.stringify(activeClientId));
-    localStorage.setItem('behaviorTracker_reviewMonth', JSON.stringify(reviewMonth.toISOString()));
+  // Firebase Auth & Data State
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [firebaseDataLoaded, setFirebaseDataLoaded] = useState(false);
 
-  }, [
-    currentView, residenceName, clients, 
-    draftName, draftBehaviors, draftDimensions, draftManeuvers, 
-    historyData, activeClientId, reviewMonth
-  ]);
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setAuthLoading(false);
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setFirebaseDataLoaded(false);
+      return;
+    }
+    const docRef = doc(db, 'organization', 'main');
+    const unsub = onSnapshot(docRef, (snap) => {
+      if (snap.metadata.hasPendingWrites) return; // ignore local updates echoing back
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.clients) setClients(data.clients);
+        if (data.residenceName !== undefined) setResidenceName(data.residenceName);
+        if (data.historyData) setHistoryData(data.historyData);
+      }
+      setFirebaseDataLoaded(true);
+    });
+    return () => unsub();
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || !firebaseDataLoaded) return;
+    const docRef = doc(db, 'organization', 'main');
+    setDoc(docRef, { clients, residenceName, historyData }, { merge: true });
+  }, [clients, residenceName, historyData, user, firebaseDataLoaded]);
 
   // Load entry data when client, date, or shift changes
   useEffect(() => {
@@ -541,6 +543,60 @@ function App() {
     setExportModal('success');
   };
 
+  const handleAuth = async (e) => {
+    e.preventDefault();
+    setAuthError('');
+    try {
+      if (isRegistering) {
+        await createUserWithEmailAndPassword(auth, loginEmail, loginPassword);
+      } else {
+        await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
+      }
+    } catch (err) {
+      setAuthError(err.message);
+    }
+  };
+
+  if (authLoading) {
+    return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#f1f5f9', color: '#64748b', fontSize: '1.2rem', fontFamily: 'Inter, sans-serif' }}>Loading secure environment...</div>;
+  }
+
+  if (!user) {
+    return (
+      <div className="layout" style={{ justifyContent: 'center', alignItems: 'center', backgroundColor: '#f1f5f9' }}>
+        <div className="white-card" style={{ maxWidth: '400px', width: '100%', padding: '3rem 2rem' }}>
+          <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+            <img src={tcfdLogo} alt="TCFD Logo" style={{ height: '60px', marginBottom: '1rem' }} />
+            <h2 style={{ color: '#0f172a' }}>Behavior Data Tracker</h2>
+            <p style={{ color: '#64748b', fontSize: '0.9rem', marginTop: '0.5rem' }}>Please log in to sync your clinical data securely.</p>
+          </div>
+          
+          <form onSubmit={handleAuth}>
+            <div className="form-group">
+              <label className="form-label">Email Address</label>
+              <input type="email" required className="form-control" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} />
+            </div>
+            <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+              <label className="form-label">Password</label>
+              <input type="password" required className="form-control" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} />
+            </div>
+            {authError && <div style={{ color: '#ef4444', marginBottom: '1rem', fontSize: '0.85rem', textAlign: 'center' }}>{authError}</div>}
+            
+            <button type="submit" className="btn-orange" style={{ width: '100%', justifyContent: 'center' }}>
+              {isRegistering ? 'Create Account' : 'Secure Login'}
+            </button>
+            
+            <div style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.85rem' }}>
+              <button type="button" onClick={() => setIsRegistering(!isRegistering)} style={{ background: 'none', border: 'none', color: '#3b82f6', cursor: 'pointer', textDecoration: 'underline' }}>
+                {isRegistering ? 'Already have an account? Log in' : 'Need an account? Register'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   if (currentView === 'review') {
     const year = reviewMonth.getFullYear();
     const month = reviewMonth.getMonth();
@@ -860,6 +916,9 @@ function App() {
             <img src={tcfdLogo} alt="TCFD Logo" className="nav-logo" />
             <span className="brand-text">Behavior Data Sheet Configuration</span>
           </div>
+          <button onClick={() => signOut(auth)} className="btn-orange-outline" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <LogOut size={16} /> Sign Out
+          </button>
         </header>
 
         <div className="content-wrapper">
