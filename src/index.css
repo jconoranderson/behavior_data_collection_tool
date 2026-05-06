@@ -360,6 +360,15 @@ select.form-control {
   .tracker-controls {
     justify-content: center;
   }
+  .tracker-filters {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .tracker-filters {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Tracker View */
@@ -390,6 +399,17 @@ select.form-control {
 .tracker-brand h2 {
   font-size: 1.75rem;
   font-weight: 700;
+}
+
+.tracker-filters {
+  display: grid;
+  grid-template-columns: auto 1fr 1fr 1.5fr;
+  gap: 1.5rem;
+  background-color: #f8f9fa;
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  align-items: end;
 }
 
 .tracker-info {
