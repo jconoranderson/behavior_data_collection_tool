@@ -827,22 +827,9 @@ function App() {
         <div style={{ marginBottom: '2rem' }}>
           {/* Top Row: Brand & Controls */}
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '2px solid var(--primary)' }}>
-            <div className="tracker-brand">
+            <div className="tracker-brand" style={{ alignItems: 'center' }}>
               <img src={tcfdLogo} alt="TCFD Logo" className="nav-logo" />
               <h2>BEHAVIOR DATA SHEET</h2>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-              <div className="tracker-controls">
-                <button onClick={() => setCurrentView('review')} className="btn-orange-outline">
-                  <Calendar size={20} /> Review Data
-                </button>
-                <button className="btn-orange-outline" onClick={handleExport}>
-                  <Download size={18} /> Export Full History
-                </button>
-                <button onClick={() => signOut(auth)} className="btn-orange-outline" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#ef4444', borderColor: '#ef4444' }}>
-                  <LogOut size={16} /> Sign Out
-                </button>
-              </div>
               <button
                 onClick={openConfigWithPassword}
                 title="Edit Configuration"
@@ -852,12 +839,23 @@ function App() {
                   color: '#64748b', borderRadius: '6px',
                   padding: '0.4rem 0.75rem', fontSize: '0.8rem',
                   cursor: 'pointer', whiteSpace: 'nowrap',
-                  transition: 'all 0.2s'
+                  transition: 'all 0.2s', marginLeft: '0.75rem'
                 }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = '#475569'; e.currentTarget.style.color = '#334155'; }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = '#94a3b8'; e.currentTarget.style.color = '#64748b'; }}
               >
                 <Shield size={14} /> Edit Configuration
+              </button>
+            </div>
+            <div className="tracker-controls">
+              <button onClick={() => setCurrentView('review')} className="btn-orange-outline">
+                <Calendar size={20} /> Review Data
+              </button>
+              <button className="btn-orange-outline" onClick={handleExport}>
+                <Download size={18} /> Export Full History
+              </button>
+              <button onClick={() => signOut(auth)} className="btn-orange-outline" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#ef4444', borderColor: '#ef4444' }}>
+                <LogOut size={16} /> Sign Out
               </button>
             </div>
           </div>
