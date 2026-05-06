@@ -491,119 +491,246 @@ function App() {
   };
 
   const handleExport = () => {
-    if (!activeClientObj) return;
-
-    const clientRecords = historyData.filter(r => r.clientId === activeClientObj.id);
-    
-    if (clientRecords.length === 0) {
-      alert("No data available to export for this client.");
+    if (historyData.length === 0) {
+      alert("No data available to export.");
       return;
     }
 
-    // Determine setup date (fallback to earliest record)
-    let setupDateStr = activeClientObj.setupDate;
-    if (!setupDateStr) {
-      setupDateStr = clientRecords.map(r => r.date).sort()[0];
-    }
-    
-    const todayStr = getLocalISODate(new Date());
-    const now = new Date();
-    const currentHour = now.getHours();
-    
-    const isPastOrCurrentShift = (dateStr, shift) => {
-      if (dateStr < todayStr) return true;
-      if (dateStr > todayStr) return false;
-      // it is today
-      if (shift === "7am-3pm (Education)") return currentHour >= 7;
-      if (shift === "3pm-11pm") return currentHour >= 15;
-      if (shift === "11pm-7am") return currentHour >= 23;
-      return true;
-    };
-
-    const requiredShifts = [];
-    const [sY, sM, sD] = setupDateStr.split('-').map(Number);
-    const [eY, eM, eD] = todayStr.split('-').map(Number);
-    let currentD = new Date(sY, sM - 1, sD);
-    const endD = new Date(eY, eM - 1, eD);
-    
-    while (currentD <= endD) {
-      const dStr = getLocalISODate(currentD);
-      SHIFTS.forEach(shift => {
-        if (isPastOrCurrentShift(dStr, shift)) {
-          requiredShifts.push({ date: dStr, shift });
-        }
-      });
-      currentD.setDate(currentD.getDate() + 1);
-    }
-
-    const allErrors = [];
-    
-    requiredShifts.forEach(req => {
-      const record = clientRecords.find(r => r.date === req.date && r.shift === req.shift);
-      if (!record) {
-        allErrors.push(`Missing completely: ${req.date} (${req.shift}). Please complete it or click 'No Behavior'.`);
-      } else {
-        const errs = validateRecord(record, activeClientObj);
-        allErrors.push(...errs);
-      }
-    });
-
-    if (allErrors.length > 0) {
-      const displayErrors = allErrors.length > 20 ? [...allErrors.slice(0, 20), `...and ${allErrors.length - 20} more errors.`] : allErrors;
-      setExportModal({ errors: displayErrors });
-      return;
-    }
-
-    clientRecords.sort((a, b) => {
-      if (a.date !== b.date) return a.date.localeCompare(b.date);
-      return SHIFTS.indexOf(a.shift) - SHIFTS.indexOf(b.shift);
-    });
-
-    const columns = clientRecords.map(r => `${r.date}\n${r.shift}`);
-
-    const rows = [];
-    rows.push([`BEHAVIOR DATA SHEET — ${activeClientObj.name}`, ...Array(columns.length).fill('')]);
-    if (activeResidence) {
-      rows.push([`Residence: ${activeResidence}`, ...Array(columns.length).fill('')]);
-    }
-    rows.push([]);
-    rows.push(['Date & Shift', ...columns]);
-
-    activeBehaviors.forEach(behavior => {
-      const dims = activeDimensions[behavior] || [];
-      const subRows = dims.flatMap(dim => AVAILABLE_DIMENSIONS[dim] || []);
-      rows.push([behavior, ...Array(columns.length).fill('')]);
-      subRows.forEach(sub => {
-        rows.push([`  ${sub}`, ...clientRecords.map(r => {
-          const val = r.data[`${behavior}_${sub}`];
-          if (val === 'NO DATA') return 'NO DATA';
-          const parsed = parseInt(val, 10);
-          return isNaN(parsed) ? '' : parsed;
-        })]);
-      });
-    });
-
-    if (activeManeuvers.size > 0) {
-      rows.push([]);
-      rows.push(['SCIP-R Maneuvers', ...Array(columns.length).fill('')]);
-      Array.from(activeManeuvers).forEach(m => {
-        rows.push([`  ${m}`, ...clientRecords.map(r => {
-          const val = r.data[`SCIP_${m}`];
-          if (val === 'NO DATA') return 'NO DATA';
-          const parsed = parseInt(val, 10);
-          return isNaN(parsed) ? '' : parsed;
-        })]);
-      });
-    }
-
-    rows.push([]);
-    rows.push(['Comments', ...clientRecords.map(r => r.data['Comments'] || '')]);
-
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{ wch: 35 }, ...columns.map(() => ({ wch: 22 }))];
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Behavior Data');
-    const filename = `BehaviorData_${activeClientObj.name.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+    // Palette: cycle through these colors per behavior group
+    const BEH_COLORS = [
+      { header: 'FFB3C6', sub: 'FFDDE5' },  // pink
+      { header: 'B3D9FF', sub: 'DCEEFF' },  // blue
+      { header: 'B3F0C6', sub: 'DCFAE6' },  // green
+      { header: 'FFE0B3', sub: 'FFF3DC' },  // orange
+      { header: 'E0B3FF', sub: 'F3DCFF' },  // purple
+      { header: 'B3FFF0', sub: 'DCFFF9' },  // teal
+    ];
+
+    // Group history by "YYYY-MM"
+    const monthMap = {};
+    historyData.forEach(rec => {
+      const [y, m] = rec.date.split('-');
+      const key = `${y}-${m}`;
+      if (!monthMap[key]) monthMap[key] = [];
+      monthMap[key].push(rec);
+    });
+
+    Object.entries(monthMap)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .forEach(([monthKey, records]) => {
+        const [year, monthIdx] = monthKey.split('-');
+        const sheetLabel = `${MONTH_NAMES[parseInt(monthIdx)-1].slice(0,3)} ${year}`;
+
+        // Sort: by date, then shift order
+        records.sort((a, b) => {
+          if (a.date !== b.date) return a.date.localeCompare(b.date);
+          return SHIFTS.indexOf(a.shift) - SHIFTS.indexOf(b.shift);
+        });
+
+        // Gather all clients that appear this month, in a stable order
+        const clientIds = [...new Set(records.map(r => r.clientId))];
+        const monthClients = clientIds.map(id => clients.find(c => c.id === id)).filter(Boolean);
+
+        // Build column schema:
+        // Fixed cols: Date | Shift | Resident | No Behavior | Notes/Comments
+        // Then per client-behavior: each sub-dimension column
+
+        // We'll build a flat list of column descriptors
+        const colDefs = [
+          { label: 'Date', type: 'fixed' },
+          { label: 'Shift', type: 'fixed' },
+          { label: 'Resident', type: 'fixed' },
+          { label: 'No Behavior', type: 'fixed' },
+          { label: 'Comments', type: 'fixed' },
+        ];
+
+        // Track behavior groups for header merging
+        const behaviorGroups = []; // { clientId, behavior, startCol, endCol, colorIdx }
+        let colorIdx = 0;
+
+        monthClients.forEach(client => {
+          (client.behaviors || []).forEach(behavior => {
+            const dims = (client.dimensions || {})[behavior] || [];
+            const subs = dims.flatMap(d => AVAILABLE_DIMENSIONS[d] || []);
+            if (subs.length === 0) return;
+            const startCol = colDefs.length;
+            subs.forEach(sub => {
+              colDefs.push({ label: sub, type: 'behavior', clientId: client.id, behavior, sub });
+            });
+            // SCIP-R maneuvers for this client
+            if ((client.maneuvers || []).length > 0) {
+              // handled below
+            }
+            behaviorGroups.push({
+              clientId: client.id,
+              clientName: client.name,
+              behavior,
+              startCol,
+              endCol: colDefs.length - 1,
+              colorIdx: colorIdx % BEH_COLORS.length,
+            });
+            colorIdx++;
+          });
+          // SCIP-R maneuvers as their own group
+          if ((client.maneuvers || []).length > 0) {
+            const startCol = colDefs.length;
+            (client.maneuvers).forEach(m => {
+              colDefs.push({ label: m, type: 'scip', clientId: client.id, maneuver: m });
+            });
+            behaviorGroups.push({
+              clientId: client.id,
+              clientName: client.name,
+              behavior: 'SCIP-R Maneuvers',
+              startCol,
+              endCol: colDefs.length - 1,
+              colorIdx: colorIdx % BEH_COLORS.length,
+            });
+            colorIdx++;
+          }
+        });
+
+        // Build AOA rows
+        // Row 0: Residence + month title
+        // Row 1: Resident name banners (spans behavior cols per client)
+        // Row 2: Behavior group headers
+        // Row 3: Sub-dimension headers
+        // Row 4+: Data
+
+        const totalCols = colDefs.length;
+        const blankRow = () => Array(totalCols).fill('');
+
+        const titleRow = blankRow();
+        titleRow[0] = `${activeResidence || 'Behavior Data'} — ${sheetLabel}`;
+
+        // Row 1: blank (will be styled later or used for resident label)
+        const residentRow = blankRow();
+        // Put each client name over their behavior columns
+        behaviorGroups.forEach(g => {
+          if (g.startCol <= g.endCol) residentRow[g.startCol] = g.clientName;
+        });
+
+        // Row 2: Behavior group headers
+        const behaviorRow = blankRow();
+        behaviorRow[0] = 'Date'; behaviorRow[1] = 'Shift'; behaviorRow[2] = 'Resident';
+        behaviorRow[3] = 'No Behavior'; behaviorRow[4] = 'Comments';
+        behaviorGroups.forEach(g => {
+          behaviorRow[g.startCol] = g.behavior;
+        });
+
+        // Row 3: Sub-dimension headers
+        const subRow = blankRow();
+        subRow[0] = ''; subRow[1] = ''; subRow[2] = ''; subRow[3] = ''; subRow[4] = '';
+        colDefs.forEach((col, i) => {
+          if (i >= 5) subRow[i] = col.label;
+        });
+
+        const aoa = [titleRow, residentRow, behaviorRow, subRow];
+
+        // Data rows
+        records.forEach(rec => {
+          const client = clients.find(c => c.id === rec.clientId);
+          if (!client) return;
+
+          // Check "no behavior" flag: if all behavior cells are 'NO BEHAVIOR'
+          const behaviors = client.behaviors || [];
+          const allNoBehavior = behaviors.length > 0 && behaviors.every(behavior => {
+            const dims = (client.dimensions || {})[behavior] || [];
+            const subs = dims.flatMap(d => AVAILABLE_DIMENSIONS[d] || []);
+            return subs.length > 0 && subs.every(sub => rec.data[`${behavior}_${sub}`] === 'NO BEHAVIOR');
+          });
+
+          const row = blankRow();
+          // Format date nicely: "Day DD"
+          const d = new Date(rec.date + 'T12:00:00');
+          row[0] = `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`;
+          row[1] = rec.shift;
+          row[2] = client.name;
+          row[3] = allNoBehavior ? 'NO BEHAVIOR' : '';
+          row[4] = rec.data['Comments'] || '';
+
+          colDefs.forEach((col, i) => {
+            if (i < 5) return;
+            if (col.type === 'behavior' && col.clientId === client.id) {
+              const val = rec.data[`${col.behavior}_${col.sub}`];
+              if (val === 'NO BEHAVIOR') row[i] = 'NO BEHAVIOR';
+              else if (val === 'NO DATA') row[i] = 'NO DATA';
+              else {
+                const parsed = parseInt(val, 10);
+                row[i] = isNaN(parsed) ? '' : parsed;
+              }
+            }
+            if (col.type === 'scip' && col.clientId === client.id) {
+              const val = rec.data[`SCIP_${col.maneuver}`];
+              if (val === 'NO DATA') row[i] = 'NO DATA';
+              else {
+                const parsed = parseInt(val, 10);
+                row[i] = isNaN(parsed) ? '' : parsed;
+              }
+            }
+          });
+
+          aoa.push(row);
+        });
+
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+        // Column widths
+        ws['!cols'] = colDefs.map((col, i) => {
+          if (i === 0) return { wch: 14 };
+          if (i === 1) return { wch: 22 };
+          if (i === 2) return { wch: 16 };
+          if (i === 3) return { wch: 14 };
+          if (i === 4) return { wch: 28 };
+          return { wch: 12 };
+        });
+
+        // Merges: title row spans all cols
+        ws['!merges'] = [
+          { s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } },
+        ];
+        // Merge behavior group headers
+        behaviorGroups.forEach(g => {
+          if (g.endCol > g.startCol) {
+            ws['!merges'].push({ s: { r: 2, c: g.startCol }, e: { r: 2, c: g.endCol } });
+            ws['!merges'].push({ s: { r: 1, c: g.startCol }, e: { r: 1, c: g.endCol } });
+          }
+        });
+
+        // Cell styling using XLSX-style (if supported; otherwise skipped gracefully)
+        const setCellStyle = (r, c, style) => {
+          const addr = XLSX.utils.encode_cell({ r, c });
+          if (!ws[addr]) ws[addr] = { v: '', t: 's' };
+          ws[addr].s = style;
+        };
+
+        const boldCenter = { font: { bold: true }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true } };
+        const titleStyle = { font: { bold: true, sz: 13 }, alignment: { horizontal: 'left' }, fill: { fgColor: { rgb: 'F8F9FA' } } };
+
+        setCellStyle(0, 0, titleStyle);
+
+        // Style behavior header rows
+        behaviorGroups.forEach(g => {
+          const pal = BEH_COLORS[g.colorIdx];
+          for (let c = g.startCol; c <= g.endCol; c++) {
+            setCellStyle(1, c, { ...boldCenter, fill: { fgColor: { rgb: pal.header } } });
+            setCellStyle(2, c, { ...boldCenter, fill: { fgColor: { rgb: pal.header } } });
+            setCellStyle(3, c, { ...boldCenter, fill: { fgColor: { rgb: pal.sub } } });
+          }
+        });
+
+        // Style fixed header cells
+        [0,1,2,3,4].forEach(c => {
+          setCellStyle(2, c, { font: { bold: true }, alignment: { horizontal: 'center' }, fill: { fgColor: { rgb: 'E2E8F0' } } });
+          setCellStyle(3, c, { font: { bold: true }, alignment: { horizontal: 'center' }, fill: { fgColor: { rgb: 'E2E8F0' } } });
+        });
+
+        XLSX.utils.book_append_sheet(wb, ws, sheetLabel);
+      });
+
+    const filename = `BehaviorData_${activeResidence || 'All'}_${new Date().toISOString().slice(0, 10)}.xlsx`;
     XLSX.writeFile(wb, filename);
     setExportModal('success');
   };
