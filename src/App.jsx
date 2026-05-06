@@ -3,7 +3,7 @@ import { Table, Plus, Minus, Trash2, Shield, Activity, User, ArrowLeft, Download
 import * as XLSX from 'xlsx';
 import tcfdLogo from './assets/tcfd.jpg';
 import { auth, db } from './firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, sendEmailVerification } from 'firebase/auth';
 import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 
 const AVAILABLE_BEHAVIORS = [
@@ -118,7 +118,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!user) {
+    if (!user || !user.emailVerified) {
       setFirebaseDataLoaded(false);
       return;
     }
@@ -137,7 +137,7 @@ function App() {
   }, [user]);
 
   useEffect(() => {
-    if (!user || !firebaseDataLoaded) return;
+    if (!user || !user.emailVerified || !firebaseDataLoaded) return;
     const docRef = doc(db, 'organization', 'main');
     setDoc(docRef, { clients, residenceName, historyData }, { merge: true });
   }, [clients, residenceName, historyData, user, firebaseDataLoaded]);
@@ -548,7 +548,8 @@ function App() {
     setAuthError('');
     try {
       if (isRegistering) {
-        await createUserWithEmailAndPassword(auth, loginEmail, loginPassword);
+        const userCredential = await createUserWithEmailAndPassword(auth, loginEmail, loginPassword);
+        await sendEmailVerification(userCredential.user);
       } else {
         await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
       }
@@ -592,6 +593,42 @@ function App() {
               </button>
             </div>
           </form>
+        </div>
+      </div>
+    );
+  }
+
+  if (user && !user.emailVerified) {
+    return (
+      <div className="layout" style={{ justifyContent: 'center', alignItems: 'center', backgroundColor: '#f1f5f9' }}>
+        <div className="white-card" style={{ maxWidth: '400px', width: '100%', padding: '3rem 2rem', textAlign: 'center' }}>
+          <AlertTriangle size={48} color="#f59e0b" style={{ margin: '0 auto 1rem auto', display: 'block' }} />
+          <h2 style={{ color: '#0f172a', marginBottom: '1rem' }}>Verify Your Email</h2>
+          <p style={{ color: '#64748b', marginBottom: '1.5rem', lineHeight: '1.5' }}>
+            We sent a verification link to <strong>{user.email}</strong>. Please check your inbox and click the link to activate your account.
+          </p>
+          <button 
+            className="btn-orange" 
+            style={{ width: '100%', justifyContent: 'center', marginBottom: '1rem' }}
+            onClick={async () => {
+              await auth.currentUser.reload();
+              if (auth.currentUser.emailVerified) {
+                setUser({...auth.currentUser});
+              } else {
+                setAuthError("Email not verified yet. Please check your spam folder.");
+              }
+            }}
+          >
+            I've Verified My Email
+          </button>
+          <button 
+            className="btn-orange-outline" 
+            style={{ width: '100%', justifyContent: 'center' }}
+            onClick={() => signOut(auth)}
+          >
+            Sign Out
+          </button>
+          {authError && <div style={{ color: '#ef4444', marginTop: '1rem', fontSize: '0.85rem' }}>{authError}</div>}
         </div>
       </div>
     );
