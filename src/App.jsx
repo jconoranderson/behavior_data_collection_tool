@@ -831,18 +831,33 @@ function App() {
               <img src={tcfdLogo} alt="TCFD Logo" className="nav-logo" />
               <h2>BEHAVIOR DATA SHEET</h2>
             </div>
-            <div className="tracker-controls">
-              <button onClick={() => setCurrentView('review')} className="btn-orange-outline">
-                <Calendar size={20} /> Review Data
-              </button>
-              <button className="btn-orange-outline" onClick={handleExport}>
-                <Download size={18} /> Export Full History
-              </button>
-              <button onClick={openConfigWithPassword} className="btn-orange-outline">
-                <ArrowLeft size={20} /> Edit Configuration
-              </button>
-              <button onClick={() => signOut(auth)} className="btn-orange-outline" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#ef4444', borderColor: '#ef4444' }}>
-                <LogOut size={16} /> Sign Out
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+              <div className="tracker-controls">
+                <button onClick={() => setCurrentView('review')} className="btn-orange-outline">
+                  <Calendar size={20} /> Review Data
+                </button>
+                <button className="btn-orange-outline" onClick={handleExport}>
+                  <Download size={18} /> Export Full History
+                </button>
+                <button onClick={() => signOut(auth)} className="btn-orange-outline" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#ef4444', borderColor: '#ef4444' }}>
+                  <LogOut size={16} /> Sign Out
+                </button>
+              </div>
+              <button
+                onClick={openConfigWithPassword}
+                title="Edit Configuration"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '0.4rem',
+                  background: 'none', border: '1px solid #94a3b8',
+                  color: '#64748b', borderRadius: '6px',
+                  padding: '0.4rem 0.75rem', fontSize: '0.8rem',
+                  cursor: 'pointer', whiteSpace: 'nowrap',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = '#475569'; e.currentTarget.style.color = '#334155'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = '#94a3b8'; e.currentTarget.style.color = '#64748b'; }}
+              >
+                <Shield size={14} /> Edit Configuration
               </button>
             </div>
           </div>
