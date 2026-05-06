@@ -558,6 +558,16 @@ function App() {
   const handleAuth = async (e) => {
     e.preventDefault();
     setAuthError('');
+
+    // --- SECURITY RESTRICTION ---
+    // Change this to whatever domain or prefix you want to restrict to.
+    const allowedDomain = "@tcfd.org"; // e.g. "@tcfd.org"
+    
+    if (!loginEmail.toLowerCase().endsWith(allowedDomain)) {
+      setAuthError(`Access restricted: Only staff with a ${allowedDomain} email address may access this system.`);
+      return;
+    }
+
     try {
       if (isRegistering) {
         const userCredential = await createUserWithEmailAndPassword(auth, loginEmail, loginPassword);
