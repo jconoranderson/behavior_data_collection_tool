@@ -288,7 +288,7 @@ function App() {
   };
 
   // Tracker Logic Helpers
-  const filteredClients = clients.filter(c => !c.residence || c.residence === activeResidence);
+  const filteredClients = clients.filter(c => c.residence === activeResidence);
   const activeClientObj = clients.find(c => c.id === activeClientId);
   const activeBehaviors = activeClientObj?.behaviors || [];
   const activeDimensions = activeClientObj?.dimensions || {};
