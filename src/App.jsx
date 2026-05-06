@@ -789,6 +789,9 @@ function App() {
               <button onClick={() => setCurrentView('setup')} className="btn-orange-outline">
                 <ArrowLeft size={20} /> Back to Setup
               </button>
+              <button onClick={() => signOut(auth)} className="btn-orange-outline" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#ef4444', borderColor: '#ef4444' }}>
+                <LogOut size={16} /> Sign Out
+              </button>
             </div>
           </div>
           
@@ -976,9 +979,6 @@ function App() {
             <img src={tcfdLogo} alt="TCFD Logo" className="nav-logo" />
             <span className="brand-text">Behavior Data Sheet Configuration</span>
           </div>
-          <button onClick={() => signOut(auth)} className="btn-orange-outline" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <LogOut size={16} /> Sign Out
-          </button>
         </header>
 
         <div className="content-wrapper">
