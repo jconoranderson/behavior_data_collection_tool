@@ -15,8 +15,8 @@ const AVAILABLE_BEHAVIORS = [
 ];
 
 const AVAILABLE_DIMENSIONS = {
-  "Intensity": ["Level 1", "Level 2", "Level 3"],
-  "Duration": ["<1 min", "1-5 min", "5+ min"],
+  "Intensity": ["Not Specified", "1", "2", "3", "4"],
+  "Duration": ["Not Specified", "<5", "6-10", "11-15", "16-20", "20+"],
   "Frequency": ["Frequency"],
   "Attempts": ["Attempts"],
   "Successes": ["Successes"]
@@ -547,10 +547,15 @@ function App() {
           const colDefs = [
             { label: 'Date', type: 'fixed' },
             { label: 'Shift', type: 'fixed' },
-            { label: 'No Behavior', type: 'fixed' },
-            { label: 'Comments', type: 'fixed' },
+            { label: 'No Data', type: 'fixed' },
+            { label: '', type: 'fixed' }, // Column D (blank)
+            { label: 'Freq', type: 'fixed' }, // Column E
+            { label: 'Comments', type: 'fixed' }, // Moved further right or after behaviors? User said E is Frequency.
           ];
 
+          // We'll put Comments at the end of each behavior group or at the very end.
+          // In the screenshot, Comments seems to follow the behavior group.
+          
           const behaviorGroups = [];
           let colorIdx = 0;
 
@@ -562,6 +567,9 @@ function App() {
             subs.forEach(sub => {
               colDefs.push({ label: sub, type: 'behavior', behavior, sub });
             });
+            // Add a "Comments" column for this specific behavior group if it matches the workbook style
+            colDefs.push({ label: 'Comments', type: 'comment', behavior });
+
             behaviorGroups.push({
               behavior,
               startCol,
@@ -571,67 +579,91 @@ function App() {
             colorIdx++;
           });
 
-          if ((client.maneuvers || []).length > 0) {
-            const startCol = colDefs.length;
-            client.maneuvers.forEach(m => {
-              colDefs.push({ label: m, type: 'scip', maneuver: m });
-            });
-            behaviorGroups.push({
-              behavior: 'SCIP-R Maneuvers',
-              startCol,
-              endCol: colDefs.length - 1,
-              colorIdx: colorIdx % BEH_COLORS.length,
-            });
-            colorIdx++;
-          }
-
           const totalCols = colDefs.length;
           const blankRow = () => Array(totalCols).fill('');
 
           // Row 0: "Residence — Month Year — Resident Name"
           const titleRow = blankRow();
-          titleRow[0] = `${activeResidence || 'Behavior Data'}  |  ${monthLabel}  |  ${client.name}`;
+          titleRow[0] = `${client.residence || activeResidence || 'Behavior Data'}  |  ${monthLabel}  |  ${client.name}`;
 
           // Row 1: behavior group headers
           const behaviorRow = blankRow();
           behaviorRow[0] = 'Date'; behaviorRow[1] = 'Shift';
-          behaviorRow[2] = 'No Behavior'; behaviorRow[3] = 'Comments';
+          behaviorRow[2] = 'No Data'; behaviorRow[4] = 'Freq';
           behaviorGroups.forEach(g => { behaviorRow[g.startCol] = g.behavior; });
 
           // Row 2: sub-dimension headers
           const subRow = blankRow();
-          colDefs.forEach((col, i) => { if (i >= 4) subRow[i] = col.label; });
+          colDefs.forEach((col, i) => { if (i >= 5 || i === 4) subRow[i] = col.label; });
 
           const aoa = [titleRow, behaviorRow, subRow];
 
           // Data rows
           clientRecords.forEach(rec => {
-            const behaviors = client.behaviors || [];
-            const allNoBehavior = behaviors.length > 0 && behaviors.every(behavior => {
-              const dims = (client.dimensions || {})[behavior] || [];
-              const subs = dims.flatMap(d => AVAILABLE_DIMENSIONS[d] || []);
-              return subs.length > 0 && subs.every(sub => rec.data[`${behavior}_${sub}`] === 'NO BEHAVIOR');
-            });
-
             const row = blankRow();
             const d = new Date(rec.date + 'T12:00:00');
             row[0] = `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`;
             row[1] = rec.shift;
-            row[2] = allNoBehavior ? 'NO BEHAVIOR' : '';
-            row[3] = rec.data['Comments'] || '';
+            
+            // Check if ANY data exists for this shift
+            const hasAnyData = Object.values(rec.data).some(v => v !== 'NO DATA' && v !== '' && v !== undefined);
+            row[2] = hasAnyData ? '' : 'No Data Recorded';
 
+            // Calculate overall Frequency (Column E / index 4)
+            let totalFreq = 0;
+            
             colDefs.forEach((col, i) => {
-              if (i < 4) return;
+              if (i < 5) return;
               if (col.type === 'behavior') {
                 const val = rec.data[`${col.behavior}_${col.sub}`];
-                if (val === 'NO BEHAVIOR') row[i] = 'NO BEHAVIOR';
-                else if (val === 'NO DATA') row[i] = 'NO DATA';
+                if (val !== 'NO BEHAVIOR' && val !== 'NO DATA' && val !== '' && val !== undefined) {
+                  const p = parseInt(val, 10);
+                  if (!isNaN(p)) {
+                    row[i] = p;
+                    // Only add to total freq if it's one of the "counting" dimensions
+                    // Usually we sum Intensity OR Duration (since they should match) plus attempts/successes
+                    // To be safe and avoid double counting I/D, we'll sum all numeric entries but divide by 2 for I/D pairs
+                    // Or just count "Events" based on the highest count in any dimension for that behavior
+                  }
+                }
+              }
+            });
+
+            // Improved Frequency Logic: Sum of counts per behavior
+            let shiftFrequency = 0;
+            (client.behaviors || []).forEach(beh => {
+              const dims = (client.dimensions || {})[beh] || [];
+              let behMax = 0;
+              // Intensity / Duration / Frequency / Attempts / Successes
+              // We'll take the max of (Intensity Sum, Duration Sum, Frequency) then add Attempts and Successes
+              const iSum = getIntensitySum(beh, rec.data);
+              const dSum = getDurationSum(beh, rec.data);
+              const fVal = parseInt(rec.data[`${beh}_Frequency`], 10) || 0;
+              const aVal = parseInt(rec.data[`${beh}_Attempts`], 10) || 0;
+              const sVal = parseInt(rec.data[`${beh}_Successes`], 10) || 0;
+              
+              behMax = Math.max(iSum, dSum, fVal);
+              shiftFrequency += (behMax + aVal + sVal);
+            });
+            row[4] = shiftFrequency > 0 ? shiftFrequency : 0;
+
+            // Fill behavior cells and comments
+            colDefs.forEach((col, i) => {
+              if (i < 5) return;
+              if (col.type === 'behavior') {
+                const val = rec.data[`${col.behavior}_${col.sub}`];
+                if (val === 'NO BEHAVIOR') row[i] = 0;
+                else if (val === 'NO DATA') row[i] = '';
                 else { const p = parseInt(val, 10); row[i] = isNaN(p) ? '' : p; }
+              }
+              if (col.type === 'comment') {
+                // If it's a general behavior group comment or the main comment
+                row[i] = rec.data[`${col.behavior}_Comments`] || rec.data['Comments'] || '';
               }
               if (col.type === 'scip') {
                 const val = rec.data[`SCIP_${col.maneuver}`];
-                if (val === 'NO DATA') row[i] = 'NO DATA';
-                else { const p = parseInt(val, 10); row[i] = isNaN(p) ? '' : p; }
+                const p = parseInt(val, 10);
+                row[i] = isNaN(p) ? '' : p;
               }
             });
 
@@ -641,11 +673,12 @@ function App() {
           const ws = XLSX.utils.aoa_to_sheet(aoa);
 
           ws['!cols'] = colDefs.map((col, i) => {
-            if (i === 0) return { wch: 14 };
-            if (i === 1) return { wch: 22 };
-            if (i === 2) return { wch: 14 };
-            if (i === 3) return { wch: 30 };
-            return { wch: 12 };
+            if (i === 0) return { wch: 12 };
+            if (i === 1) return { wch: 20 };
+            if (i === 2) return { wch: 18 };
+            if (i === 3) return { wch: 4 };
+            if (i === 4) return { wch: 8 };
+            return { wch: 10 };
           });
 
           ws['!merges'] = [
@@ -674,7 +707,7 @@ function App() {
             }
           });
 
-          [0,1,2,3].forEach(c => {
+          [0,1,2,3,4].forEach(c => {
             setCellStyle(1, c, { font: { bold: true }, alignment: { horizontal: 'center' }, fill: { fgColor: { rgb: 'E2E8F0' } } });
             setCellStyle(2, c, { font: { bold: true }, alignment: { horizontal: 'center' }, fill: { fgColor: { rgb: 'E2E8F0' } } });
           });
