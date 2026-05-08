@@ -328,6 +328,27 @@ function App() {
     setCurrentEntryData(prev => {
       const nextData = { ...prev, [key]: value };
       
+      // Auto-fill sibling sub-dimensions with 0 when a positive value is entered
+      // e.g. entering "1" for Aggression_Level 1 should set all other Aggression intensity/duration subs to 0 if empty
+      const parsed = parseInt(value, 10);
+      if (!isNaN(parsed) && parsed > 0) {
+        // Find which behavior this key belongs to
+        activeBehaviors.forEach(behavior => {
+          const dims = activeDimensions[behavior] || [];
+          const subs = dims.flatMap(dim => AVAILABLE_DIMENSIONS[dim] || []);
+          const allKeys = subs.map(sub => `${behavior}_${sub}`);
+          
+          if (allKeys.includes(key)) {
+            // This key belongs to this behavior — fill empty siblings with 0
+            allKeys.forEach(siblingKey => {
+              if (siblingKey !== key && (nextData[siblingKey] === undefined || nextData[siblingKey] === '')) {
+                nextData[siblingKey] = 0;
+              }
+            });
+          }
+        });
+      }
+      
       if (activeClientId && activeDate && activeShift) {
         setHistoryData(prevHistory => {
           const newHistory = [...prevHistory];
@@ -1088,17 +1109,41 @@ function App() {
                         </div>
                       </td>
                     </tr>
-                    {subRows.map(sub => (
-                      <tr key={`${behavior}_${sub}`}>
-                        <td style={{ paddingLeft: '30px', fontStyle: 'italic', backgroundColor: '#f8f8f8' }}>{sub}</td>
-                        <td style={{ backgroundColor: '#fff', padding: '0.5rem', display: 'flex', justifyContent: 'center' }}>
-                          <RockerInput
-                            value={currentEntryData[`${behavior}_${sub}`] !== undefined ? currentEntryData[`${behavior}_${sub}`] : ''}
-                            onChange={val => handleCellChange(`${behavior}_${sub}`, val)}
-                          />
-                        </td>
-                      </tr>
-                    ))}
+                    {dims.map(dim => {
+                      const dimSubs = AVAILABLE_DIMENSIONS[dim] || [];
+                      return (
+                        <React.Fragment key={`${behavior}_dim_${dim}`}>
+                          {/* Dimension group label row (Intensity, Duration, etc.) */}
+                          {(dim === 'Intensity' || dim === 'Duration') && (
+                            <tr>
+                              <td colSpan={2} style={{
+                                paddingLeft: '20px',
+                                fontWeight: '600',
+                                fontSize: '0.8rem',
+                                color: '#475569',
+                                backgroundColor: dim === 'Intensity' ? '#fef3f2' : '#eff6ff',
+                                borderLeft: `3px solid ${dim === 'Intensity' ? '#f87171' : '#60a5fa'}`,
+                                letterSpacing: '0.03em',
+                                textTransform: 'uppercase'
+                              }}>
+                                {dim}
+                              </td>
+                            </tr>
+                          )}
+                          {dimSubs.map(sub => (
+                            <tr key={`${behavior}_${sub}`}>
+                              <td style={{ paddingLeft: (dim === 'Intensity' || dim === 'Duration') ? '40px' : '30px', fontStyle: 'italic', backgroundColor: '#f8f8f8' }}>{sub}</td>
+                              <td style={{ backgroundColor: '#fff', padding: '0.5rem', display: 'flex', justifyContent: 'center' }}>
+                                <RockerInput
+                                  value={currentEntryData[`${behavior}_${sub}`] !== undefined ? currentEntryData[`${behavior}_${sub}`] : ''}
+                                  onChange={val => handleCellChange(`${behavior}_${sub}`, val)}
+                                />
+                              </td>
+                            </tr>
+                          ))}
+                        </React.Fragment>
+                      );
+                    })}
                   </React.Fragment>
                 );
               })}
