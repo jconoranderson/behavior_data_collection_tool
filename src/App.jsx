@@ -598,35 +598,35 @@ function App() {
           const clientRecords = records.filter(r => r.clientId === client.id);
           if (clientRecords.length === 0) return;
 
-          // Tab name: "May 2026 - John" (Excel max 31 chars)
           const rawLabel = `${shortMonth} ${year} - ${client.name}`;
           const sheetLabel = rawLabel.slice(0, 31);
 
-          // Build column schema for this single client
+          // Fixed columns: Date | Shift | No Data
           const colDefs = [
             { label: 'Date', type: 'fixed' },
             { label: 'Shift', type: 'fixed' },
             { label: 'No Data', type: 'fixed' },
-            { label: '', type: 'fixed' }, // Column D (blank)
-            { label: 'Freq', type: 'fixed' }, // Column E
-            { label: 'Comments', type: 'fixed' }, // Moved further right or after behaviors? User said E is Frequency.
           ];
 
-          // We'll put Comments at the end of each behavior group or at the very end.
-          // In the screenshot, Comments seems to follow the behavior group.
-          
           const behaviorGroups = [];
           let colorIdx = 0;
 
+          // Per behavior: Freq | [sub-dimensions...] | Comments
           (client.behaviors || []).forEach(behavior => {
             const dims = (client.dimensions || {})[behavior] || [];
             const subs = dims.flatMap(d => AVAILABLE_DIMENSIONS[d] || []);
             if (subs.length === 0) return;
             const startCol = colDefs.length;
+
+            // Freq column for this behavior
+            colDefs.push({ label: 'Freq', type: 'freq', behavior });
+
+            // Sub-dimension columns
             subs.forEach(sub => {
               colDefs.push({ label: sub, type: 'behavior', behavior, sub });
             });
-            // Add a "Comments" column for this specific behavior group if it matches the workbook style
+
+            // Comments column for this behavior
             colDefs.push({ label: 'Comments', type: 'comment', behavior });
 
             behaviorGroups.push({
@@ -638,22 +638,36 @@ function App() {
             colorIdx++;
           });
 
+          // SCIP-R maneuvers after all behaviors
+          if ((client.maneuvers || []).length > 0) {
+            const startCol = colDefs.length;
+            client.maneuvers.forEach(m => {
+              colDefs.push({ label: m, type: 'scip', maneuver: m });
+            });
+            behaviorGroups.push({
+              behavior: 'SCIP-R Maneuvers',
+              startCol,
+              endCol: colDefs.length - 1,
+              colorIdx: colorIdx % BEH_COLORS.length,
+            });
+            colorIdx++;
+          }
+
           const totalCols = colDefs.length;
           const blankRow = () => Array(totalCols).fill('');
 
-          // Row 0: "Residence — Month Year — Resident Name"
+          // Row 0: Title
           const titleRow = blankRow();
           titleRow[0] = `${client.residence || activeResidence || 'Behavior Data'}  |  ${monthLabel}  |  ${client.name}`;
 
-          // Row 1: behavior group headers
+          // Row 1: Behavior group headers (merged across their columns)
           const behaviorRow = blankRow();
-          behaviorRow[0] = 'Date'; behaviorRow[1] = 'Shift';
-          behaviorRow[2] = 'No Data'; behaviorRow[4] = 'Freq';
+          behaviorRow[0] = 'Date'; behaviorRow[1] = 'Shift'; behaviorRow[2] = 'No Data';
           behaviorGroups.forEach(g => { behaviorRow[g.startCol] = g.behavior; });
 
-          // Row 2: sub-dimension headers
+          // Row 2: Sub-dimension headers
           const subRow = blankRow();
-          colDefs.forEach((col, i) => { if (i >= 5 || i === 4) subRow[i] = col.label; });
+          colDefs.forEach((col, i) => { if (i >= 3) subRow[i] = col.label; });
 
           const aoa = [titleRow, behaviorRow, subRow];
 
@@ -664,6 +678,7 @@ function App() {
             row[0] = `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`;
             row[1] = rec.shift;
             
+            // Determine No Data status across ALL behaviors
             const behaviors = client.behaviors || [];
             let totalSubCount = 0;
             let zeroCount = 0;
@@ -686,50 +701,52 @@ function App() {
               });
             });
 
-            // Determine states for Column C and Frequency (Column E)
-            let colC = '';
-            let freqVal = '';
-            
             if (totalSubCount > 0 && nullCount === totalSubCount) {
-              // 100% missing data
-              colC = 'No Data Recorded';
-              freqVal = '';
+              row[2] = 'No Data Recorded';
             } else if (totalSubCount > 0 && positiveCount === 0 && zeroCount > 0) {
-              // At least some zeros explicitly recorded, and NO positive events
-              colC = 'No Behaviors';
-              freqVal = 0;
-            } else {
-              // There is positive data (or no behaviors configured)
-              colC = '';
-              let shiftFrequency = 0;
-              behaviors.forEach(beh => {
-                const iSum = getIntensitySum(beh, rec.data);
-                const dSum = getDurationSum(beh, rec.data);
-                const fVal = parseInt(rec.data[`${beh}_Frequency`], 10) || 0;
-                const aVal = parseInt(rec.data[`${beh}_Attempts`], 10) || 0;
-                const sVal = parseInt(rec.data[`${beh}_Successes`], 10) || 0;
-                
-                const behMax = Math.max(iSum, dSum, fVal);
-                shiftFrequency += (behMax + aVal + sVal);
-              });
-              freqVal = shiftFrequency;
+              row[2] = 'No Behaviors';
             }
 
-            row[2] = colC;
-            row[4] = freqVal;
-
-            // Fill behavior cells and comments
+            // Fill per-column data
             colDefs.forEach((col, i) => {
-              if (i < 5) return;
+              if (i < 3) return;
+
+              if (col.type === 'freq') {
+                // Per-behavior frequency
+                const beh = col.behavior;
+                const dims = (client.dimensions || {})[beh] || [];
+                const subs = dims.flatMap(d => AVAILABLE_DIMENSIONS[d] || []);
+                
+                // Check if this behavior has any data at all
+                const behNullCount = subs.filter(sub => {
+                  const v = rec.data[`${beh}_${sub}`];
+                  return v === 'NO DATA' || v === '' || v === undefined;
+                }).length;
+
+                if (behNullCount === subs.length) {
+                  row[i] = ''; // No data for this behavior
+                } else {
+                  const iSum = getIntensitySum(beh, rec.data);
+                  const dSum = getDurationSum(beh, rec.data);
+                  const fVal = parseInt(rec.data[`${beh}_Frequency`], 10) || 0;
+                  const aVal = parseInt(rec.data[`${beh}_Attempts`], 10) || 0;
+                  const sVal = parseInt(rec.data[`${beh}_Successes`], 10) || 0;
+                  const behMax = Math.max(iSum, dSum, fVal);
+                  row[i] = behMax + aVal + sVal;
+                }
+              }
+
               if (col.type === 'behavior') {
                 const val = rec.data[`${col.behavior}_${col.sub}`];
                 if (val === 'NO BEHAVIOR') row[i] = 0;
                 else if (val === 'NO DATA') row[i] = '';
                 else { const p = parseInt(val, 10); row[i] = isNaN(p) ? '' : p; }
               }
+
               if (col.type === 'comment') {
-                row[i] = rec.data[`${col.behavior}_Comments`] || rec.data['Comments'] || '';
+                row[i] = rec.data['Comments'] || '';
               }
+
               if (col.type === 'scip') {
                 const val = rec.data[`SCIP_${col.maneuver}`];
                 const p = parseInt(val, 10);
@@ -742,12 +759,12 @@ function App() {
 
           const ws = XLSX.utils.aoa_to_sheet(aoa);
 
-          ws['!cols'] = colDefs.map((col, i) => {
-            if (i === 0) return { wch: 12 };
-            if (i === 1) return { wch: 20 };
-            if (i === 2) return { wch: 18 };
-            if (i === 3) return { wch: 4 };
-            if (i === 4) return { wch: 8 };
+          ws['!cols'] = colDefs.map((col) => {
+            if (col.label === 'Date') return { wch: 12 };
+            if (col.label === 'Shift') return { wch: 20 };
+            if (col.label === 'No Data') return { wch: 18 };
+            if (col.type === 'freq') return { wch: 6 };
+            if (col.type === 'comment') return { wch: 24 };
             return { wch: 10 };
           });
 
@@ -777,7 +794,7 @@ function App() {
             }
           });
 
-          [0,1,2,3,4].forEach(c => {
+          [0,1,2].forEach(c => {
             setCellStyle(1, c, { font: { bold: true }, alignment: { horizontal: 'center' }, fill: { fgColor: { rgb: 'E2E8F0' } } });
             setCellStyle(2, c, { font: { bold: true }, alignment: { horizontal: 'center' }, fill: { fgColor: { rgb: 'E2E8F0' } } });
           });
