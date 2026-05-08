@@ -1120,9 +1120,8 @@ function App() {
                                 paddingLeft: '20px',
                                 fontWeight: '600',
                                 fontSize: '0.8rem',
-                                color: '#475569',
-                                backgroundColor: dim === 'Intensity' ? '#fef3f2' : '#eff6ff',
-                                borderLeft: `3px solid ${dim === 'Intensity' ? '#f87171' : '#60a5fa'}`,
+                                color: '#64748b',
+                                backgroundColor: '#f1f5f9',
                                 letterSpacing: '0.03em',
                                 textTransform: 'uppercase'
                               }}>
