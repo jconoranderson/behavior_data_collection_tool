@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Table, Plus, Minus, Trash2, Shield, Activity, User, ArrowLeft, Download, AlertTriangle, CheckCircle, Eraser, RotateCcw, Cloud, CloudUpload, CloudDownload, Save, UserPlus, Calendar, LogOut } from 'lucide-react';
+import { Table, Plus, Minus, Trash2, Shield, Activity, User, ArrowLeft, Download, AlertTriangle, CheckCircle, Eraser, RotateCcw, Cloud, CloudUpload, CloudDownload, Save, UserPlus, Calendar, LogOut, Settings } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import tcfdLogo from './assets/tcfd.jpg';
 import { auth, db } from './firebase';
@@ -87,6 +87,7 @@ function App() {
   const [draftDimensions, setDraftDimensions] = useState({});
   const [draftManeuvers, setDraftManeuvers] = useState(new Set());
   const [selectedBehaviorInput, setSelectedBehaviorInput] = useState('');
+  const [editingClientId, setEditingClientId] = useState(null);
 
   // Longitudinal data
   const [historyData, setHistoryData] = useState([]);
@@ -212,6 +213,24 @@ function App() {
 
 
 
+  const loadClientForEditing = (client) => {
+    setEditingClientId(client.id);
+    setDraftName(client.name);
+    setDraftBehaviors([...client.behaviors]);
+    setDraftDimensions({ ...client.dimensions });
+    setDraftManeuvers(new Set(client.maneuvers || []));
+    setSelectedBehaviorInput('');
+  };
+
+  const cancelEditing = () => {
+    setEditingClientId(null);
+    setDraftName('');
+    setDraftBehaviors([]);
+    setDraftDimensions({});
+    setDraftManeuvers(new Set());
+    setSelectedBehaviorInput('');
+  };
+
   const saveDraftResident = () => {
     if (!activeResidence) {
       alert("Please add and select a Residence first.");
@@ -219,6 +238,25 @@ function App() {
     }
     if (!draftName.trim()) {
       alert("Please enter a Resident Name before adding.");
+      return;
+    }
+
+    if (editingClientId) {
+      // Update existing client
+      setClients(prev => prev.map(c => {
+        if (c.id === editingClientId) {
+          return {
+            ...c,
+            name: draftName.trim(),
+            behaviors: draftBehaviors,
+            dimensions: draftDimensions,
+            maneuvers: Array.from(draftManeuvers)
+          };
+        }
+        return c;
+      }));
+      alert(`Resident profile for ${draftName.trim()} has been updated!`);
+      cancelEditing();
       return;
     }
     
@@ -1325,10 +1363,13 @@ function App() {
                   <h3 style={{ marginBottom: '1rem', color: '#0f172a' }}><User size={20} style={{ verticalAlign: 'middle', marginRight: '0.5rem' }}/> Configured Residents in {activeResidence || 'Location'}</h3>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                     {filteredClients.map(c => (
-                      <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#f1f5f9', padding: '0.75rem 1rem', borderRadius: '20px', border: '1px solid #cbd5e1' }}>
+                      <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: editingClientId === c.id ? '#fef3c7' : '#f1f5f9', padding: '0.75rem 1rem', borderRadius: '20px', border: editingClientId === c.id ? '2px solid var(--primary)' : '1px solid #cbd5e1' }}>
                         <span style={{ fontWeight: '600' }}>{c.name}</span>
                         <span style={{ fontSize: '0.8rem', color: '#64748b' }}>({c.behaviors.length} behaviors)</span>
-                        <button onClick={() => removeClient(c.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', marginLeft: '0.5rem' }}>
+                        <button onClick={() => loadClientForEditing(c)} style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', display: 'flex', marginLeft: '0.25rem' }} title="Edit resident">
+                          <Settings size={16} />
+                        </button>
+                        <button onClick={() => removeClient(c.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex' }} title="Remove resident">
                           <Trash2 size={16} />
                         </button>
                       </div>
@@ -1339,7 +1380,12 @@ function App() {
             </div>
 
             <div className="section" style={{ border: '2px dashed #cbd5e1', padding: '2rem', borderRadius: '12px', backgroundColor: '#fafafa' }}>
-              <h2 className="section-title" style={{ marginBottom: '1.5rem', color: '#334155' }}><UserPlus size={24} /> Configure New Resident</h2>
+              <h2 className="section-title" style={{ marginBottom: '1.5rem', color: '#334155' }}><UserPlus size={24} /> {editingClientId ? `Editing: ${draftName}` : 'Configure New Resident'}</h2>
+              {editingClientId && (
+                <button className="btn-orange-outline" style={{ marginBottom: '1rem', fontSize: '0.85rem' }} onClick={cancelEditing}>
+                  Cancel Editing
+                </button>
+              )}
               
               <div className="form-group">
                 <label className="form-label">Resident Name</label>
@@ -1431,7 +1477,7 @@ function App() {
 
             <div className="generate-area" style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '3rem' }}>
               <button className="btn-orange-outline large" onClick={saveDraftResident}>
-                <UserPlus size={24} /> Add Resident
+                <UserPlus size={24} /> {editingClientId ? 'Save Changes' : 'Add Resident'}
               </button>
 
               <button className="btn-orange large" onClick={openTracker}>
