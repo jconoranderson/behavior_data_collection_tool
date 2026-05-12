@@ -456,39 +456,7 @@ function App() {
     });
   };
 
-  const markNoData = (behavior) => {
-    const dims = activeDimensions[behavior] || [];
-    const subRows = dims.flatMap(dim => AVAILABLE_DIMENSIONS[dim] || []);
-    
-    setCurrentEntryData(prev => {
-      const nextData = { ...prev };
-      subRows.forEach(sub => {
-        nextData[`${behavior}_${sub}`] = 'NO DATA';
-      });
-      
-      if (activeClientId && activeDate && activeShift) {
-        setHistoryData(prevHistory => {
-          const newHistory = [...prevHistory];
-          const index = newHistory.findIndex(
-            r => r.clientId === activeClientId && r.date === activeDate && r.shift === activeShift
-          );
-          
-          const record = {
-            id: `${activeClientId}_${activeDate}_${activeShift}`,
-            clientId: activeClientId,
-            date: activeDate,
-            shift: activeShift,
-            data: nextData
-          };
-          if (index !== -1) newHistory[index] = record;
-          else newHistory.push(record);
-          
-          return newHistory;
-        });
-      }
-      return nextData;
-    });
-  };
+
 
   const getIntensitySum = (behavior, dataObj) => {
     let sum = 0;
@@ -1154,12 +1122,6 @@ function App() {
                             onClick={() => markNoBehavior(behavior)}
                           >
                             No Behavior
-                          </button>
-                          <button 
-                            style={{ padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 'bold', backgroundColor: '#fee2e2', color: '#ef4444', border: '1px solid #fca5a5', borderRadius: '8px', cursor: 'pointer', textTransform: 'uppercase' }}
-                            onClick={() => markNoData(behavior)}
-                          >
-                            No Data
                           </button>
                         </div>
                       </td>
