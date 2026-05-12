@@ -405,7 +405,8 @@ function App() {
               clientId: activeClientId,
               date: activeDate,
               shift: activeShift,
-              data: nextData
+              data: nextData,
+              enteredBy: user?.displayName || user?.email || 'Unknown'
             };
             if (index !== -1) {
               newHistory[index] = record;
@@ -444,7 +445,8 @@ function App() {
             clientId: activeClientId,
             date: activeDate,
             shift: activeShift,
-            data: nextData
+            data: nextData,
+            enteredBy: user?.displayName || user?.email || 'Unknown'
           };
           if (index !== -1) newHistory[index] = record;
           else newHistory.push(record);
@@ -569,11 +571,12 @@ function App() {
           const rawLabel = `${shortMonth} ${year} - ${client.name}`;
           const sheetLabel = rawLabel.slice(0, 31);
 
-          // Fixed columns: Date | Shift | No Data
+          // Fixed columns: Date | Shift | No Data | Entered By
           const colDefs = [
             { label: 'Date', type: 'fixed' },
             { label: 'Shift', type: 'fixed' },
             { label: 'No Data', type: 'fixed' },
+            { label: 'Entered By', type: 'fixed' },
           ];
 
           const behaviorGroups = [];
@@ -630,12 +633,12 @@ function App() {
 
           // Row 1: Behavior group headers (merged across their columns)
           const behaviorRow = blankRow();
-          behaviorRow[0] = 'Date'; behaviorRow[1] = 'Shift'; behaviorRow[2] = 'No Data';
+          behaviorRow[0] = 'Date'; behaviorRow[1] = 'Shift'; behaviorRow[2] = 'No Data'; behaviorRow[3] = 'Entered By';
           behaviorGroups.forEach(g => { behaviorRow[g.startCol] = g.behavior; });
 
           // Row 2: Sub-dimension headers
           const subRow = blankRow();
-          colDefs.forEach((col, i) => { if (i >= 3) subRow[i] = col.label; });
+          colDefs.forEach((col, i) => { if (i >= 4) subRow[i] = col.label; });
 
           const aoa = [titleRow, behaviorRow, subRow];
 
@@ -645,6 +648,7 @@ function App() {
             const d = new Date(rec.date + 'T12:00:00');
             row[0] = `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`;
             row[1] = rec.shift;
+            row[3] = rec.enteredBy || 'Unknown';
             
             // Determine No Data status across ALL behaviors
             const behaviors = client.behaviors || [];
@@ -677,7 +681,7 @@ function App() {
 
             // Fill per-column data
             colDefs.forEach((col, i) => {
-              if (i < 3) return;
+              if (i < 4) return;
 
               if (col.type === 'freq') {
                 // Per-behavior frequency
@@ -731,6 +735,7 @@ function App() {
             if (col.label === 'Date') return { wch: 12 };
             if (col.label === 'Shift') return { wch: 20 };
             if (col.label === 'No Data') return { wch: 18 };
+            if (col.label === 'Entered By') return { wch: 18 };
             if (col.type === 'freq') return { wch: 6 };
             if (col.type === 'comment') return { wch: 24 };
             return { wch: 10 };
@@ -762,7 +767,7 @@ function App() {
             }
           });
 
-          [0,1,2].forEach(c => {
+          [0,1,2,3].forEach(c => {
             setCellStyle(1, c, { font: { bold: true }, alignment: { horizontal: 'center' }, fill: { fgColor: { rgb: 'E2E8F0' } } });
             setCellStyle(2, c, { font: { bold: true }, alignment: { horizontal: 'center' }, fill: { fgColor: { rgb: 'E2E8F0' } } });
           });
