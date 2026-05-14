@@ -459,6 +459,24 @@ function App() {
     });
   };
 
+  const clearAllData = async () => {
+    if (window.confirm("WARNING: Are you sure you want to clear ALL existing data (Residences, Clients, and History)? This cannot be undone.")) {
+      try {
+        await setDoc(doc(db, 'organization', 'main'), {
+          residences: [],
+          clients: [],
+          historyData: []
+        });
+        setResidences([]);
+        setClients([]);
+        setHistoryData([]);
+        alert("All data has been cleared.");
+      } catch (err) {
+        alert("Error clearing data: " + err.message);
+      }
+    }
+  };
+
   const markNoBehavior = (behavior) => {
     const dims = activeDimensions[behavior] || [];
     const subRows = dims.flatMap(dim => AVAILABLE_DIMENSIONS[dim] || []);
@@ -1519,6 +1537,12 @@ function App() {
 
               <button className="btn-orange large" onClick={openTracker}>
                 <CheckCircle size={24} /> Complete Configuration
+              </button>
+            </div>
+
+            <div style={{ marginTop: '3rem', paddingTop: '2rem', borderTop: '1px solid #e2e8f0', textAlign: 'center' }}>
+              <button onClick={clearAllData} className="btn-orange-outline" style={{ color: '#ef4444', borderColor: '#ef4444' }}>
+                <Trash2 size={16} style={{ marginRight: '0.5rem' }} /> Factory Reset (Clear All Data)
               </button>
             </div>
           </div>
