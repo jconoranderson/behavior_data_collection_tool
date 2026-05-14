@@ -714,10 +714,14 @@ function App() {
 
           const aoa = [titleRow, behaviorRow, subRow];
 
-          // Data rows for every day and shift of the month
-          const daysInMonth = new Date(parseInt(year, 10), parseInt(monthIdx, 10), 0).getDate();
+          // Data rows: only from the first date entered to the last date entered for this client
+          const dates = clientRecords.map(r => r.date).sort();
+          const firstDateStr = dates[0];
+          const lastDateStr = dates[dates.length - 1];
+          const firstDay = parseInt(firstDateStr.split('-')[2], 10);
+          const lastDay = parseInt(lastDateStr.split('-')[2], 10);
 
-          for (let d = 1; d <= daysInMonth; d++) {
+          for (let d = firstDay; d <= lastDay; d++) {
             const dateStr = `${year}-${monthIdx}-${String(d).padStart(2, '0')}`;
             
             SHIFTS.forEach(shift => {
