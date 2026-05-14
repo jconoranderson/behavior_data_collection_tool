@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Table, Plus, Minus, Trash2, Shield, Activity, User, ArrowLeft, Download, AlertTriangle, CheckCircle, Eraser, RotateCcw, Cloud, CloudUpload, CloudDownload, Save, UserPlus, Calendar, LogOut, Settings } from 'lucide-react';
+import { Table, Plus, Minus, Trash2, Shield, Activity, User, ArrowLeft, Download, AlertTriangle, CheckCircle, Eraser, RotateCcw, Cloud, CloudUpload, CloudDownload, Save, UserPlus, Calendar, LogOut, Settings, Edit } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import tcfdLogo from './assets/tcfd.jpg';
 import { auth, db } from './firebase';
@@ -1364,6 +1364,27 @@ function App() {
                   {residences.map(r => (
                     <div key={r} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#f1f5f9', padding: '0.5rem 1rem', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
                       <span style={{ fontWeight: '600' }}>{r}</span>
+                      <button type="button" onClick={() => {
+                        const newName = window.prompt("Edit residence name:", r);
+                        if (newName && newName.trim() && newName.trim() !== r) {
+                          const trimmed = newName.trim();
+                          if (residences.includes(trimmed)) {
+                            alert("A residence with this name already exists.");
+                            return;
+                          }
+                          const updatedRes = residences.map(x => x === r ? trimmed : x);
+                          setResidences(updatedRes);
+                          if (activeResidence === r) setActiveResidence(trimmed);
+                          
+                          const updatedClients = clients.map(c => {
+                            if (c.residence === r) return { ...c, residence: trimmed };
+                            return c;
+                          });
+                          setClients(updatedClients);
+                        }
+                      }} style={{ background: 'none', border: 'none', color: '#3b82f6', cursor: 'pointer', padding: '0 0.25rem' }}>
+                        <Edit size={14} />
+                      </button>
                       <button type="button" onClick={() => {
                         const newRes = residences.filter(x => x !== r);
                         setResidences(newRes);
