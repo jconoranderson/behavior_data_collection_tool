@@ -74,6 +74,7 @@ const RockerInput = ({ value, onChange }) => {
 };
 
 function App() {
+  const initialLoadDone = React.useRef(false);
   const [currentView, setCurrentView] = useState(null);
   const [residences, setResidences] = useState([]);
   const [activeResidence, setActiveResidence] = useState('');
@@ -150,6 +151,7 @@ function App() {
   useEffect(() => {
     if (!user) {
       setFirebaseDataLoaded(false);
+      initialLoadDone.current = false;
       return;
     }
     const docRef = doc(db, 'organization', 'main');
@@ -158,13 +160,13 @@ function App() {
       if (snap.exists()) {
         const data = snap.data();
         const loadedResidences = data.residences || (data.residenceName ? [data.residenceName] : []);
-        if (loadedResidences.length) setResidences(loadedResidences);
+        setResidences(loadedResidences);
 
         if (data.clients) setClients(data.clients);
 
         if (data.historyData) setHistoryData(data.historyData);
 
-        if (!firebaseDataLoaded) {
+        if (!initialLoadDone.current) {
           if (data.clients && data.clients.length > 0) {
             setCurrentView('tracker');
             const firstRes = (data.residences && data.residences[0]) || data.residenceName || '';
@@ -175,8 +177,9 @@ function App() {
           }
         }
       } else {
-        if (!firebaseDataLoaded) setCurrentView('setup');
+        if (!initialLoadDone.current) setCurrentView('setup');
       }
+      initialLoadDone.current = true;
       setFirebaseDataLoaded(true);
     });
     return () => unsub();
@@ -996,9 +999,6 @@ function App() {
           <div className="tracker-controls">
             <button onClick={() => setCurrentView('tracker')} className="btn-orange">
               <Table size={20} /> Data Entry
-            </button>
-            <button onClick={openConfigWithPassword} className="btn-orange-outline">
-              <ArrowLeft size={20} /> Edit Configuration
             </button>
           </div>
         </div>
