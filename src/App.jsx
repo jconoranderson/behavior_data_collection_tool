@@ -714,109 +714,122 @@ function App() {
 
           const aoa = [titleRow, behaviorRow, subRow];
 
-          // Data rows
-          clientRecords.forEach(rec => {
-            const row = blankRow();
-            const d = new Date(rec.date + 'T12:00:00');
-            row[0] = `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`;
-            row[1] = rec.shift;
-            if (rec.enteredBy && rec.enteredBy !== 'Unknown') {
-              row[3] = rec.enteredBy.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
-            } else {
-              row[3] = 'Unknown';
-            }
+          // Data rows for every day and shift of the month
+          const daysInMonth = new Date(parseInt(year, 10), parseInt(monthIdx, 10), 0).getDate();
+
+          for (let d = 1; d <= daysInMonth; d++) {
+            const dateStr = `${year}-${monthIdx}-${String(d).padStart(2, '0')}`;
             
-            // Determine No Data status across ALL behaviors
-            const behaviors = client.behaviors || [];
-            let totalSubCount = 0;
-            let zeroCount = 0;
-            let nullCount = 0;
-            let loaCount = 0;
-            let positiveCount = 0;
-            
-            behaviors.forEach(beh => {
-              const dims = (client.dimensions || {})[beh] || [];
-              const subs = dims.flatMap(d => AVAILABLE_DIMENSIONS[d] || []);
-              subs.forEach(sub => {
-                totalSubCount++;
-                const val = rec.data[`${beh}_${sub}`];
-                if (val === 'LOA') {
-                  loaCount++;
-                } else if (val === 'NO DATA' || val === '' || val === undefined) {
-                  nullCount++;
-                } else if (val === 0 || val === '0') {
-                  zeroCount++;
-                } else {
-                  positiveCount++;
+            SHIFTS.forEach(shift => {
+              const rec = clientRecords.find(r => r.date === dateStr && r.shift === shift);
+              const row = blankRow();
+              const dateObj = new Date(dateStr + 'T12:00:00');
+              row[0] = `${dateObj.getMonth()+1}/${dateObj.getDate()}/${dateObj.getFullYear()}`;
+              row[1] = shift;
+              
+              if (!rec) {
+                row[2] = 'No Data Recorded';
+                row[3] = '';
+                aoa.push(row);
+                return;
+              }
+
+              if (rec.enteredBy && rec.enteredBy !== 'Unknown') {
+                row[3] = rec.enteredBy.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+              } else {
+                row[3] = 'Unknown';
+              }
+              
+              // Determine No Data status across ALL behaviors
+              const behaviors = client.behaviors || [];
+              let totalSubCount = 0;
+              let zeroCount = 0;
+              let nullCount = 0;
+              let loaCount = 0;
+              let positiveCount = 0;
+              
+              behaviors.forEach(beh => {
+                const dims = (client.dimensions || {})[beh] || [];
+                const subs = dims.flatMap(dim => AVAILABLE_DIMENSIONS[dim] || []);
+                subs.forEach(sub => {
+                  totalSubCount++;
+                  const val = rec.data[`${beh}_${sub}`];
+                  if (val === 'LOA') {
+                    loaCount++;
+                  } else if (val === 'NO DATA' || val === '' || val === undefined) {
+                    nullCount++;
+                  } else if (val === 0 || val === '0') {
+                    zeroCount++;
+                  } else {
+                    positiveCount++;
+                  }
+                });
+              });
+
+              if (totalSubCount > 0 && nullCount === totalSubCount) {
+                row[2] = 'No Data Recorded';
+              } else if (totalSubCount > 0 && positiveCount === 0 && zeroCount > 0) {
+                row[2] = 'No Behaviors';
+              }
+
+              // Fill per-column data
+              colDefs.forEach((col, i) => {
+                if (i < 4) return;
+
+                if (col.type === 'freq') {
+                  const beh = col.behavior;
+                  const dims = (client.dimensions || {})[beh] || [];
+                  const subs = dims.flatMap(dim => AVAILABLE_DIMENSIONS[dim] || []);
+                  
+                  const behNullCount = subs.filter(sub => {
+                    const v = rec.data[`${beh}_${sub}`];
+                    return v === 'NO DATA' || v === '' || v === undefined;
+                  }).length;
+
+                  const behLOACount = subs.filter(sub => {
+                    return rec.data[`${beh}_${sub}`] === 'LOA';
+                  }).length;
+
+                  if (behNullCount === subs.length && subs.length > 0) {
+                    row[i] = ''; 
+                  } else if (behLOACount === subs.length && subs.length > 0) {
+                    row[i] = 'LOA';
+                  } else {
+                    const iSum = getIntensitySum(beh, rec.data);
+                    const dSum = getDurationSum(beh, rec.data);
+                    const fVal = parseInt(rec.data[`${beh}_Frequency`], 10) || 0;
+                    const aVal = parseInt(rec.data[`${beh}_Attempts`], 10) || 0;
+                    const sVal = parseInt(rec.data[`${beh}_Successes`], 10) || 0;
+                    const behMax = Math.max(iSum, dSum, fVal);
+                    row[i] = behMax + aVal + sVal;
+                  }
+                }
+
+                if (col.type === 'behavior') {
+                  const val = rec.data[`${col.behavior}_${col.sub}`];
+                  if (val === 'NO BEHAVIOR') row[i] = 0;
+                  else if (val === 'NO DATA') row[i] = '';
+                  else if (val === 'LOA') row[i] = 'LOA';
+                  else { const p = parseInt(val, 10); row[i] = isNaN(p) ? '' : p; }
+                }
+
+                if (col.type === 'comment') {
+                  row[i] = rec.data['Comments'] || '';
+                }
+
+                if (col.type === 'scip') {
+                  const val = rec.data[`SCIP_${col.maneuver}`];
+                  if (val === 'LOA') row[i] = 'LOA';
+                  else {
+                    const p = parseInt(val, 10);
+                    row[i] = isNaN(p) ? '' : p;
+                  }
                 }
               });
+
+              aoa.push(row);
             });
-
-            if (totalSubCount > 0 && nullCount === totalSubCount) {
-              row[2] = 'No Data Recorded';
-            } else if (totalSubCount > 0 && positiveCount === 0 && zeroCount > 0) {
-              row[2] = 'No Behaviors';
-            }
-
-            // Fill per-column data
-            colDefs.forEach((col, i) => {
-              if (i < 4) return;
-
-              if (col.type === 'freq') {
-                // Per-behavior frequency
-                const beh = col.behavior;
-                const dims = (client.dimensions || {})[beh] || [];
-                const subs = dims.flatMap(d => AVAILABLE_DIMENSIONS[d] || []);
-                
-                // Check if this behavior has any data at all
-                const behNullCount = subs.filter(sub => {
-                  const v = rec.data[`${beh}_${sub}`];
-                  return v === 'NO DATA' || v === '' || v === undefined;
-                }).length;
-
-                const behLOACount = subs.filter(sub => {
-                  return rec.data[`${beh}_${sub}`] === 'LOA';
-                }).length;
-
-                if (behNullCount === subs.length && subs.length > 0) {
-                  row[i] = ''; // No data for this behavior
-                } else if (behLOACount === subs.length && subs.length > 0) {
-                  row[i] = 'LOA'; // LOA for this behavior
-                } else {
-                  const iSum = getIntensitySum(beh, rec.data);
-                  const dSum = getDurationSum(beh, rec.data);
-                  const fVal = parseInt(rec.data[`${beh}_Frequency`], 10) || 0;
-                  const aVal = parseInt(rec.data[`${beh}_Attempts`], 10) || 0;
-                  const sVal = parseInt(rec.data[`${beh}_Successes`], 10) || 0;
-                  const behMax = Math.max(iSum, dSum, fVal);
-                  row[i] = behMax + aVal + sVal;
-                }
-              }
-
-              if (col.type === 'behavior') {
-                const val = rec.data[`${col.behavior}_${col.sub}`];
-                if (val === 'NO BEHAVIOR') row[i] = 0;
-                else if (val === 'NO DATA') row[i] = '';
-                else if (val === 'LOA') row[i] = 'LOA';
-                else { const p = parseInt(val, 10); row[i] = isNaN(p) ? '' : p; }
-              }
-
-              if (col.type === 'comment') {
-                row[i] = rec.data['Comments'] || '';
-              }
-
-              if (col.type === 'scip') {
-                const val = rec.data[`SCIP_${col.maneuver}`];
-                if (val === 'LOA') row[i] = 'LOA';
-                else {
-                  const p = parseInt(val, 10);
-                  row[i] = isNaN(p) ? '' : p;
-                }
-              }
-            });
-
-            aoa.push(row);
-          });
+          }
 
           const ws = XLSX.utils.aoa_to_sheet(aoa);
 
