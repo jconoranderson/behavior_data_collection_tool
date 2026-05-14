@@ -4,7 +4,7 @@ import * as XLSX from 'xlsx';
 import tcfdLogo from './assets/tcfd.jpg';
 import { auth, db } from './firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, sendEmailVerification, updateProfile } from 'firebase/auth';
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, deleteField } from 'firebase/firestore';
 
 const AVAILABLE_BEHAVIORS = [
   "Aggression", "Self-Injury", "Elopement", "Pica", "Disruptive Behaviors",
@@ -156,10 +156,9 @@ function App() {
     }
     const docRef = doc(db, 'organization', 'main');
     const unsub = onSnapshot(docRef, (snap) => {
-      if (snap.metadata.hasPendingWrites) return; // ignore local updates echoing back
       if (snap.exists()) {
         const data = snap.data();
-        const loadedResidences = data.residences || (data.residenceName ? [data.residenceName] : []);
+        const loadedResidences = data.residences !== undefined ? data.residences : (data.residenceName ? [data.residenceName] : []);
         setResidences(loadedResidences);
 
         if (data.clients) setClients(data.clients);
@@ -188,7 +187,12 @@ function App() {
   useEffect(() => {
     if (!user || !firebaseDataLoaded) return;
     const docRef = doc(db, 'organization', 'main');
-    setDoc(docRef, { clients, residences, historyData }, { merge: true });
+    setDoc(docRef, { 
+      clients, 
+      residences, 
+      historyData,
+      residenceName: deleteField()
+    }, { merge: true }).catch(err => console.error("Firestore sync failed:", err));
   }, [clients, residences, historyData, user, firebaseDataLoaded]);
 
   // Load entry data when client, date, or shift changes
