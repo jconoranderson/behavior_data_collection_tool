@@ -51,19 +51,20 @@ const getLocalISODate = (date) => {
 };
 
 const RockerInput = ({ value, onChange }) => {
-  const val = value !== '' && value !== undefined && value !== 'NO DATA' ? parseInt(value, 10) : 0;
+  const isText = value === 'NO DATA' || value === 'LOA';
+  const val = value !== '' && value !== undefined && !isText ? parseInt(value, 10) : 0;
   return (
     <div className="rocker-input">
       <button className="rocker-btn" onClick={() => onChange(Math.max(0, val - 1))}>
         <Minus size={14} />
       </button>
       <input
-        type={value === 'NO DATA' ? "text" : "number"}
+        type={isText ? "text" : "number"}
         min="0"
         className="table-input rocker-field"
         value={value === 0 ? '0' : value || ''}
         onChange={e => onChange(e.target.value)}
-        style={value === 'NO DATA' ? { color: '#ef4444', fontWeight: 'bold', fontSize: '0.75rem', width: '80px', textAlign: 'center' } : {}}
+        style={isText ? { color: value === 'LOA' ? '#d97706' : '#ef4444', fontWeight: 'bold', fontSize: '0.75rem', width: '80px', textAlign: 'center' } : {}}
       />
       <button className="rocker-btn" onClick={() => onChange(val + 1)}>
         <Plus size={14} />
@@ -423,6 +424,41 @@ function App() {
   };
 
 
+  const markLOA = (behavior) => {
+    const dims = activeDimensions[behavior] || [];
+    const subRows = dims.flatMap(dim => AVAILABLE_DIMENSIONS[dim] || []);
+    
+    setCurrentEntryData(prev => {
+      const nextData = { ...prev };
+      subRows.forEach(sub => {
+        nextData[`${behavior}_${sub}`] = 'LOA';
+      });
+      
+      if (activeClientId && activeDate && activeShift) {
+        setHistoryData(prevHistory => {
+          const newHistory = [...prevHistory];
+          const index = newHistory.findIndex(
+            r => r.clientId === activeClientId && r.date === activeDate && r.shift === activeShift
+          );
+          
+          const record = {
+            id: `${activeClientId}_${activeDate}_${activeShift}`,
+            clientId: activeClientId,
+            date: activeDate,
+            shift: activeShift,
+            data: nextData,
+            enteredBy: user?.displayName || user?.email || 'Unknown'
+          };
+          if (index !== -1) newHistory[index] = record;
+          else newHistory.push(record);
+          
+          return newHistory;
+        });
+      }
+      return nextData;
+    });
+  };
+
   const markNoBehavior = (behavior) => {
     const dims = activeDimensions[behavior] || [];
     const subRows = dims.flatMap(dim => AVAILABLE_DIMENSIONS[dim] || []);
@@ -667,7 +703,7 @@ function App() {
               subs.forEach(sub => {
                 totalSubCount++;
                 const val = rec.data[`${beh}_${sub}`];
-                if (val === 'NO DATA' || val === '' || val === undefined) {
+                if (val === 'NO DATA' || val === '' || val === undefined || val === 'LOA') {
                   nullCount++;
                 } else if (val === 0 || val === '0') {
                   zeroCount++;
@@ -716,6 +752,7 @@ function App() {
                 const val = rec.data[`${col.behavior}_${col.sub}`];
                 if (val === 'NO BEHAVIOR') row[i] = 0;
                 else if (val === 'NO DATA') row[i] = '';
+                else if (val === 'LOA') row[i] = 'LOA';
                 else { const p = parseInt(val, 10); row[i] = isNaN(p) ? '' : p; }
               }
 
@@ -1136,6 +1173,13 @@ function App() {
                             onClick={() => markNoBehavior(behavior)}
                           >
                             No Behavior
+                          </button>
+                          <button 
+                            className="btn-orange-outline" 
+                            style={{ padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 'bold', backgroundColor: '#fef3c7', color: '#d97706', borderColor: '#fcd34d', textTransform: 'uppercase' }}
+                            onClick={() => markLOA(behavior)}
+                          >
+                            LOA
                           </button>
                         </div>
                       </td>
