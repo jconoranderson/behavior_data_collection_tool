@@ -648,7 +648,11 @@ function App() {
             const d = new Date(rec.date + 'T12:00:00');
             row[0] = `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`;
             row[1] = rec.shift;
-            row[3] = rec.enteredBy || 'Unknown';
+            if (rec.enteredBy && rec.enteredBy !== 'Unknown') {
+              row[3] = rec.enteredBy.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+            } else {
+              row[3] = 'Unknown';
+            }
             
             // Determine No Data status across ALL behaviors
             const behaviors = client.behaviors || [];
@@ -1019,6 +1023,11 @@ function App() {
               >
                 <Shield size={14} /> Edit Configuration
               </button>
+              {user && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#64748b', fontSize: '0.85rem', fontWeight: 'bold', marginLeft: '1rem' }}>
+                  <User size={14} /> {user.displayName || user.email}
+                </div>
+              )}
             </div>
             <div className="tracker-controls">
               <button onClick={() => setCurrentView('review')} className="btn-orange-outline">
