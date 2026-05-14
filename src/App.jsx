@@ -3,7 +3,7 @@ import { Table, Plus, Minus, Trash2, Shield, Activity, User, ArrowLeft, Download
 import * as XLSX from 'xlsx';
 import tcfdLogo from './assets/tcfd.jpg';
 import { auth, db } from './firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, sendEmailVerification } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, sendEmailVerification, updateProfile } from 'firebase/auth';
 import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 
 const AVAILABLE_BEHAVIORS = [
@@ -109,7 +109,8 @@ function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
-  const [registerName, setRegisterName] = useState('');
+  const [registerFirstName, setRegisterFirstName] = useState('');
+  const [registerLastName, setRegisterLastName] = useState('');
   const [registerDepartment, setRegisterDepartment] = useState('');
   const [authError, setAuthError] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
@@ -855,20 +856,23 @@ function App() {
 
     try {
       if (isRegistering) {
-        if (!registerName.trim() || !registerDepartment.trim()) {
-          setAuthError("Please provide your full name and department.");
+        if (!registerFirstName.trim() || !registerLastName.trim() || !registerDepartment.trim()) {
+          setAuthError("Please provide your first name, last name, and department.");
           return;
         }
+        const fullName = `${registerFirstName.trim()} ${registerLastName.trim()}`;
         const userCredential = await createUserWithEmailAndPassword(auth, loginEmail, loginPassword);
         
         // Update user profile
         await updateProfile(userCredential.user, {
-          displayName: registerName.trim()
+          displayName: fullName
         });
         
         // Store user details in Firestore
         await setDoc(doc(db, 'users', userCredential.user.uid), {
-          name: registerName.trim(),
+          name: fullName,
+          firstName: registerFirstName.trim(),
+          lastName: registerLastName.trim(),
           department: registerDepartment.trim(),
           email: loginEmail,
           createdAt: new Date().toISOString()
@@ -899,9 +903,15 @@ function App() {
           <form onSubmit={handleAuth}>
             {isRegistering && (
               <>
-                <div className="form-group">
-                  <label className="form-label">Full Name</label>
-                  <input type="text" required className="form-control" placeholder="e.g. Jane Doe" value={registerName} onChange={e => setRegisterName(e.target.value)} />
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <div className="form-group" style={{ flex: 1 }}>
+                    <label className="form-label">First Name</label>
+                    <input type="text" required className="form-control" placeholder="e.g. Jane" value={registerFirstName} onChange={e => setRegisterFirstName(e.target.value)} />
+                  </div>
+                  <div className="form-group" style={{ flex: 1 }}>
+                    <label className="form-label">Last Name</label>
+                    <input type="text" required className="form-control" placeholder="e.g. Doe" value={registerLastName} onChange={e => setRegisterLastName(e.target.value)} />
+                  </div>
                 </div>
                 <div className="form-group">
                   <label className="form-label">Department / Role</label>
