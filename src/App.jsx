@@ -431,14 +431,25 @@ function App() {
   };
 
 
-  const markLOA = (behavior) => {
-    const dims = activeDimensions[behavior] || [];
-    const subRows = dims.flatMap(dim => AVAILABLE_DIMENSIONS[dim] || []);
-    
+  const markLOA = () => {
     setCurrentEntryData(prev => {
       const nextData = { ...prev };
-      subRows.forEach(sub => {
-        nextData[`${behavior}_${sub}`] = 'LOA';
+      
+      const behaviors = activeClientObj?.behaviors || [];
+      behaviors.forEach(behavior => {
+        const dims = activeDimensions[behavior] || [];
+        const subRows = dims.flatMap(dim => AVAILABLE_DIMENSIONS[dim] || []);
+        subRows.forEach(sub => {
+          nextData[`${behavior}_${sub}`] = 'LOA';
+        });
+        nextData[`${behavior}_Frequency`] = 'LOA';
+        nextData[`${behavior}_Attempts`] = 'LOA';
+        nextData[`${behavior}_Successes`] = 'LOA';
+      });
+
+      const maneuvers = activeClientObj?.maneuvers || [];
+      maneuvers.forEach(m => {
+        nextData[`SCIP_${m}`] = 'LOA';
       });
       
       if (activeClientId && activeDate && activeShift) {
@@ -720,6 +731,7 @@ function App() {
             let totalSubCount = 0;
             let zeroCount = 0;
             let nullCount = 0;
+            let loaCount = 0;
             let positiveCount = 0;
             
             behaviors.forEach(beh => {
@@ -728,7 +740,9 @@ function App() {
               subs.forEach(sub => {
                 totalSubCount++;
                 const val = rec.data[`${beh}_${sub}`];
-                if (val === 'NO DATA' || val === '' || val === undefined || val === 'LOA') {
+                if (val === 'LOA') {
+                  loaCount++;
+                } else if (val === 'NO DATA' || val === '' || val === undefined) {
                   nullCount++;
                 } else if (val === 0 || val === '0') {
                   zeroCount++;
@@ -760,8 +774,14 @@ function App() {
                   return v === 'NO DATA' || v === '' || v === undefined;
                 }).length;
 
-                if (behNullCount === subs.length) {
+                const behLOACount = subs.filter(sub => {
+                  return rec.data[`${beh}_${sub}`] === 'LOA';
+                }).length;
+
+                if (behNullCount === subs.length && subs.length > 0) {
                   row[i] = ''; // No data for this behavior
+                } else if (behLOACount === subs.length && subs.length > 0) {
+                  row[i] = 'LOA'; // LOA for this behavior
                 } else {
                   const iSum = getIntensitySum(beh, rec.data);
                   const dSum = getDurationSum(beh, rec.data);
@@ -787,8 +807,11 @@ function App() {
 
               if (col.type === 'scip') {
                 const val = rec.data[`SCIP_${col.maneuver}`];
-                const p = parseInt(val, 10);
-                row[i] = isNaN(p) ? '' : p;
+                if (val === 'LOA') row[i] = 'LOA';
+                else {
+                  const p = parseInt(val, 10);
+                  row[i] = isNaN(p) ? '' : p;
+                }
               }
             });
 
@@ -1156,6 +1179,16 @@ function App() {
                 {SHIFTS.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
+            
+            <div style={{ display: 'flex', alignItems: 'flex-end', marginLeft: 'auto' }}>
+              <button 
+                className="btn-orange-outline" 
+                style={{ padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 'bold', backgroundColor: '#fef3c7', color: '#d97706', borderColor: '#fcd34d', textTransform: 'uppercase', height: '38px' }}
+                onClick={markLOA}
+              >
+                Mark Shift LOA
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1204,13 +1237,6 @@ function App() {
                             onClick={() => markNoBehavior(behavior)}
                           >
                             No Behavior
-                          </button>
-                          <button 
-                            className="btn-orange-outline" 
-                            style={{ padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 'bold', backgroundColor: '#fef3c7', color: '#d97706', borderColor: '#fcd34d', textTransform: 'uppercase' }}
-                            onClick={() => markLOA(behavior)}
-                          >
-                            LOA
                           </button>
                         </div>
                       </td>
