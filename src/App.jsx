@@ -190,9 +190,8 @@ function App() {
     setDoc(docRef, { 
       clients, 
       residences, 
-      historyData,
-      residenceName: deleteField()
-    }, { merge: true }).catch(err => console.error("Firestore sync failed:", err));
+      historyData
+    }).catch(err => alert("Firestore sync failed: " + err.message));
   }, [clients, residences, historyData, user, firebaseDataLoaded]);
 
   // Load entry data when client, date, or shift changes
@@ -1365,7 +1364,7 @@ function App() {
                   {residences.map(r => (
                     <div key={r} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#f1f5f9', padding: '0.5rem 1rem', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
                       <span style={{ fontWeight: '600' }}>{r}</span>
-                      <button onClick={() => {
+                      <button type="button" onClick={() => {
                         const newRes = residences.filter(x => x !== r);
                         setResidences(newRes);
                         if (activeResidence === r) setActiveResidence(newRes[0] || '');
