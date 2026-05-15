@@ -685,12 +685,18 @@ function App() {
           const behaviorGroups = [];
           let colorIdx = 0;
 
-          // Per behavior: Freq | [sub-dimensions...] | Comments
+          // Per behavior: Subcategories | Freq | [sub-dimensions...] | Comments
           (client.behaviors || []).forEach(behavior => {
             const dims = (client.dimensions || {})[behavior] || [];
             const subs = dims.flatMap(d => AVAILABLE_DIMENSIONS[d] || []);
             if (subs.length === 0) return;
             const startCol = colDefs.length;
+
+            // Subcategory column (if any defined) — placed before Freq
+            const subcats = (client.subcategories || {})[behavior] || [];
+            if (subcats.length > 0) {
+              colDefs.push({ label: 'Subcategories', type: 'subcat', behavior });
+            }
 
             // Freq column for this behavior
             colDefs.push({ label: 'Freq', type: 'freq', behavior });
@@ -699,12 +705,6 @@ function App() {
             subs.forEach(sub => {
               colDefs.push({ label: sub, type: 'behavior', behavior, sub });
             });
-
-            // Subcategory column (if any defined)
-            const subcats = (client.subcategories || {})[behavior] || [];
-            if (subcats.length > 0) {
-              colDefs.push({ label: 'Subcategories', type: 'subcat', behavior });
-            }
 
             // Comments column for this behavior
             colDefs.push({ label: 'Comments', type: 'comment', behavior });
