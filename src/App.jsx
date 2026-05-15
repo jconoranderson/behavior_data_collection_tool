@@ -87,9 +87,32 @@ function App() {
   const [draftName, setDraftName] = useState('');
   const [draftBehaviors, setDraftBehaviors] = useState([]);
   const [draftDimensions, setDraftDimensions] = useState({});
+  const [draftSubcategories, setDraftSubcategories] = useState({});
+  const [draftSubcategoryInputs, setDraftSubcategoryInputs] = useState({});
   const [draftManeuvers, setDraftManeuvers] = useState(new Set());
   const [selectedBehaviorInput, setSelectedBehaviorInput] = useState('');
   const [editingClientId, setEditingClientId] = useState(null);
+
+  const addSubcategory = (behavior) => {
+    const text = (draftSubcategoryInputs[behavior] || '').trim();
+    if (text) {
+      setDraftSubcategories(prev => {
+        const existing = prev[behavior] || [];
+        if (!existing.includes(text)) {
+          return { ...prev, [behavior]: [...existing, text] };
+        }
+        return prev;
+      });
+      setDraftSubcategoryInputs(prev => ({ ...prev, [behavior]: '' }));
+    }
+  };
+
+  const removeSubcategory = (behavior, subcat) => {
+    setDraftSubcategories(prev => {
+      const existing = prev[behavior] || [];
+      return { ...prev, [behavior]: existing.filter(x => x !== subcat) };
+    });
+  };
 
   // Longitudinal data
   const [historyData, setHistoryData] = useState([]);
@@ -226,6 +249,8 @@ function App() {
     setDraftName(client.name);
     setDraftBehaviors([...client.behaviors]);
     setDraftDimensions({ ...client.dimensions });
+    setDraftSubcategories({ ...(client.subcategories || {}) });
+    setDraftSubcategoryInputs({});
     setDraftManeuvers(new Set(client.maneuvers || []));
     setSelectedBehaviorInput('');
   };
@@ -235,6 +260,8 @@ function App() {
     setDraftName('');
     setDraftBehaviors([]);
     setDraftDimensions({});
+    setDraftSubcategories({});
+    setDraftSubcategoryInputs({});
     setDraftManeuvers(new Set());
     setSelectedBehaviorInput('');
   };
@@ -258,6 +285,7 @@ function App() {
             name: draftName.trim(),
             behaviors: draftBehaviors,
             dimensions: draftDimensions,
+            subcategories: draftSubcategories,
             maneuvers: Array.from(draftManeuvers)
           };
         }
@@ -279,6 +307,7 @@ function App() {
       residence: activeResidence,
       behaviors: draftBehaviors,
       dimensions: draftDimensions,
+      subcategories: draftSubcategories,
       maneuvers: Array.from(draftManeuvers)
     };
 
@@ -289,6 +318,8 @@ function App() {
     setDraftName('');
     setDraftBehaviors([]);
     setDraftDimensions({});
+    setDraftSubcategories({});
+    setDraftSubcategoryInputs({});
     setDraftManeuvers(new Set());
     setSelectedBehaviorInput('');
     
@@ -1576,6 +1607,37 @@ function App() {
                               </label>
                             ))}
                           </div>
+                        </div>
+                        <div style={{ marginTop: '1.5rem' }}>
+                          <label className="form-label" style={{ fontSize: '0.9rem' }}>Behavior Subcategories (Optional):</label>
+                          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', maxWidth: '400px' }}>
+                            <input
+                              type="text"
+                              className="form-control"
+                              placeholder="e.g. Hitting, Kicking"
+                              value={draftSubcategoryInputs[behavior] || ''}
+                              onChange={e => setDraftSubcategoryInputs(prev => ({ ...prev, [behavior]: e.target.value }))}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  addSubcategory(behavior);
+                                }
+                              }}
+                            />
+                            <button className="btn-orange-outline" style={{ padding: '0 1rem' }} onClick={() => addSubcategory(behavior)}>Add</button>
+                          </div>
+                          {(draftSubcategories[behavior] || []).length > 0 && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                              {(draftSubcategories[behavior] || []).map(subcat => (
+                                <div key={subcat} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', backgroundColor: '#e2e8f0', padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.85rem' }}>
+                                  {subcat}
+                                  <button style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex' }} onClick={() => removeSubcategory(behavior, subcat)}>
+                                    <Trash2 size={12} />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
