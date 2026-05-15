@@ -41,7 +41,7 @@ const SCIPR_CATEGORIES = {
   ]
 };
 
-const SHIFTS = ["7am-3pm (Education)", "3pm-11pm", "11pm-7am"];
+const SHIFTS = ["7am-3pm", "3pm-11pm", "11pm-7am"];
 
 const getLocalISODate = (date) => {
   const y = date.getFullYear();
@@ -1186,21 +1186,20 @@ function App() {
               />
             </div>
             
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label" style={{ fontSize: '0.8rem', color: '#64748b' }}>Shift</label>
-              <select 
-                className="form-control" 
-                value={activeShift}
-                onChange={e => setActiveShift(e.target.value)}
-              >
-                {SHIFTS.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            
-            <div style={{ display: 'flex', alignItems: 'flex-end', marginLeft: 'auto' }}>
+            <div className="form-group" style={{ marginBottom: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div>
+                <label className="form-label" style={{ fontSize: '0.8rem', color: '#64748b' }}>Shift</label>
+                <select 
+                  className="form-control" 
+                  value={activeShift}
+                  onChange={e => setActiveShift(e.target.value)}
+                >
+                  {SHIFTS.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
               <button 
                 className="btn-orange-outline" 
-                style={{ padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 'bold', backgroundColor: '#fef3c7', color: '#d97706', borderColor: '#fcd34d', textTransform: 'uppercase', height: '38px' }}
+                style={{ padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 'bold', backgroundColor: '#fef3c7', color: '#d97706', borderColor: '#fcd34d', textTransform: 'uppercase', height: '38px', width: '100%' }}
                 onClick={markLOA}
               >
                 Mark Shift LOA
