@@ -700,6 +700,12 @@ function App() {
               colDefs.push({ label: sub, type: 'behavior', behavior, sub });
             });
 
+            // Subcategory column (if any defined)
+            const subcats = (client.subcategories || {})[behavior] || [];
+            if (subcats.length > 0) {
+              colDefs.push({ label: 'Subcategories', type: 'subcat', behavior });
+            }
+
             // Comments column for this behavior
             colDefs.push({ label: 'Comments', type: 'comment', behavior });
 
@@ -850,6 +856,12 @@ function App() {
 
                 if (col.type === 'comment') {
                   row[i] = rec.data['Comments'] || '';
+                }
+
+                if (col.type === 'subcat') {
+                  const beh = col.behavior;
+                  const key = `${beh}_Subcategories`;
+                  row[i] = rec ? (rec.data[key] || '') : '';
                 }
 
                 if (col.type === 'scip') {
@@ -1288,6 +1300,51 @@ function App() {
                         </div>
                       </td>
                     </tr>
+                    {/* Subcategory binary-toggle row */}
+                    {activeClientObj && (activeClientObj.subcategories || {})[behavior]?.length > 0 && (
+                      <tr>
+                        <td colSpan={2} style={{ backgroundColor: bgColor, paddingLeft: '10px', paddingTop: '0.4rem', paddingBottom: '0.4rem' }}>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b', marginRight: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Subcategories:</span>
+                            {(activeClientObj.subcategories[behavior] || []).map(subcat => {
+                              const key = `${behavior}_Subcategories`;
+                              const current = currentEntryData[key] ? currentEntryData[key].split(', ') : [];
+                              const isActive = current.includes(subcat);
+                              return (
+                                <button
+                                  key={subcat}
+                                  type="button"
+                                  onClick={() => {
+                                    const key2 = `${behavior}_Subcategories`;
+                                    const curr = currentEntryData[key2] ? currentEntryData[key2].split(', ') : [];
+                                    let next;
+                                    if (curr.includes(subcat)) {
+                                      next = curr.filter(x => x !== subcat);
+                                    } else {
+                                      next = [...curr, subcat];
+                                    }
+                                    handleCellChange(key2, next.join(', '));
+                                  }}
+                                  style={{
+                                    padding: '0.25rem 0.75rem',
+                                    fontSize: '0.78rem',
+                                    fontWeight: '600',
+                                    border: `2px solid ${isActive ? 'var(--primary)' : '#cbd5e1'}`,
+                                    borderRadius: '20px',
+                                    backgroundColor: isActive ? 'var(--primary)' : '#fff',
+                                    color: isActive ? '#fff' : '#475569',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s',
+                                  }}
+                                >
+                                  {subcat}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
                     {dims.map(dim => {
                       const dimSubs = AVAILABLE_DIMENSIONS[dim] || [];
                       return (
