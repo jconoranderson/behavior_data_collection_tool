@@ -1199,7 +1199,7 @@ function App() {
               </div>
               <button 
                 className="btn-orange-outline" 
-                style={{ padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 'bold', backgroundColor: '#fef3c7', color: '#d97706', borderColor: '#fcd34d', textTransform: 'uppercase', height: '38px', width: '100%' }}
+                style={{ padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 'bold', backgroundColor: '#fef3c7', color: '#d97706', borderColor: '#fcd34d', textTransform: 'uppercase', height: '38px', width: '100%', justifyContent: 'center' }}
                 onClick={markLOA}
               >
                 Mark Shift LOA
