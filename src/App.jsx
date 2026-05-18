@@ -3,7 +3,7 @@ import { Table, Plus, Minus, Trash2, Shield, Activity, User, ArrowLeft, Download
 import * as XLSX from 'xlsx';
 import tcfdLogo from './assets/tcfd.jpg';
 import { auth, db } from './firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, sendEmailVerification, updateProfile } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, sendEmailVerification, updateProfile, sendPasswordResetEmail } from 'firebase/auth';
 import { doc, getDoc, setDoc, onSnapshot, deleteField } from 'firebase/firestore';
 
 const AVAILABLE_BEHAVIORS = [
@@ -137,6 +137,7 @@ function App() {
   const [registerLastName, setRegisterLastName] = useState('');
   const [registerDepartment, setRegisterDepartment] = useState('');
   const [authError, setAuthError] = useState('');
+  const [resetSent, setResetSent] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
   const [firebaseDataLoaded, setFirebaseDataLoaded] = useState(false);
 
@@ -975,6 +976,20 @@ function App() {
     }
   };
 
+  const handleResetPassword = async () => {
+    if (!loginEmail.trim()) {
+      setAuthError('Please enter your email address above, then click Forgot Password.');
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, loginEmail.trim());
+      setResetSent(true);
+      setAuthError('');
+    } catch (err) {
+      setAuthError(err.message);
+    }
+  };
+
   if (authLoading) {
     return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#f1f5f9', color: '#64748b', fontSize: '1.2rem', fontFamily: 'Inter, sans-serif' }}>Loading secure environment...</div>;
   }
@@ -1017,15 +1032,21 @@ function App() {
               <input type="password" required className="form-control" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} />
             </div>
             {authError && <div style={{ color: '#ef4444', marginBottom: '1rem', fontSize: '0.85rem', textAlign: 'center' }}>{authError}</div>}
+            {resetSent && <div style={{ color: '#22c55e', marginBottom: '1rem', fontSize: '0.85rem', textAlign: 'center' }}>Password reset email sent! Check your inbox.</div>}
             
             <button type="submit" className="btn-orange" style={{ width: '100%', justifyContent: 'center' }}>
               {isRegistering ? 'Create Account' : 'Secure Login'}
             </button>
             
-            <div style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.85rem' }}>
-              <button type="button" onClick={() => setIsRegistering(!isRegistering)} style={{ background: 'none', border: 'none', color: '#3b82f6', cursor: 'pointer', textDecoration: 'underline' }}>
+            <div style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <button type="button" onClick={() => { setIsRegistering(!isRegistering); setResetSent(false); setAuthError(''); }} style={{ background: 'none', border: 'none', color: '#3b82f6', cursor: 'pointer', textDecoration: 'underline' }}>
                 {isRegistering ? 'Already have an account? Log in' : 'Need an account? Register'}
               </button>
+              {!isRegistering && (
+                <button type="button" onClick={handleResetPassword} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.8rem' }}>
+                  Forgot password?
+                </button>
+              )}
             </div>
           </form>
         </div>
