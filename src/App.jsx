@@ -686,7 +686,7 @@ function App() {
           const behaviorGroups = [];
           let colorIdx = 0;
 
-          // Per behavior: Subcategories | Freq | [sub-dimensions...] | Comments
+          // Per behavior: Topographies | Freq | [sub-dimensions...] | Comments
           (client.behaviors || []).forEach(behavior => {
             const dims = (client.dimensions || {})[behavior] || [];
             const subs = dims.flatMap(d => AVAILABLE_DIMENSIONS[d] || []);
@@ -696,7 +696,7 @@ function App() {
             // Subcategory column (if any defined) — placed before Freq
             const subcats = (client.subcategories || {})[behavior] || [];
             if (subcats.length > 0) {
-              colDefs.push({ label: 'Subcategories', type: 'subcat', behavior });
+              colDefs.push({ label: 'Topographies', type: 'subcat', behavior });
             }
 
             // Freq column for this behavior
@@ -1326,7 +1326,7 @@ function App() {
                       <tr>
                         <td colSpan={2} style={{ backgroundColor: bgColor, paddingLeft: '10px', paddingTop: '0.4rem', paddingBottom: '0.4rem' }}>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b', marginRight: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Subcategories:</span>
+                            <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b', marginRight: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Topographies:</span>
                             {(activeClientObj.subcategories[behavior] || []).map(subcat => {
                               const key = `${behavior}_Subcategories`;
                               const current = currentEntryData[key] ? currentEntryData[key].split(', ') : [];
@@ -1687,7 +1687,7 @@ function App() {
                           </div>
                         </div>
                         <div style={{ marginTop: '1.5rem' }}>
-                          <label className="form-label" style={{ fontSize: '0.9rem' }}>Behavior Subcategories (Optional):</label>
+                          <label className="form-label" style={{ fontSize: '0.9rem' }}>Behavior Topographies (Optional):</label>
                           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', maxWidth: '400px' }}>
                             <input
                               type="text"
